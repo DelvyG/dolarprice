@@ -55,6 +55,30 @@ versión vieja.
 
 **`sw.js` se sirve con `no-store`** desde el vhost. Es a propósito.
 
+**`/promo` es lo único enmarcable del sitio.** Es el creativo que verificavenezuela.org
+mete en un iframe dentro de su interstitial. El server manda
+`X-Frame-Options: SAMEORIGIN` a todo, y desde Node **no se puede quitar** esa cabecera
+porque la añade nginx. Por eso hay un `location = /promo` en el vhost que repite las otras
+cabeceras de seguridad y cambia el candado por
+`Content-Security-Policy: frame-ancestors`, que sí sabe de orígenes concretos
+(`X-Frame-Options: ALLOW-FROM` está muerto y ningún navegador lo respeta). Un `add_header`
+dentro de un `location` **cancela todos los heredados**: de ahí que haya que repetirlos.
+Si algún día se enmarca desde otro dominio, se añade a esa lista y no en otro sitio.
+
+**`/promo` y `/app` son rutas explícitas, no archivos sueltos.** Viven en
+`src/routes/pages.js`, registrado *después* de `@fastify/static` porque usan
+`reply.sendFile()`. Si se dejaran como `public/promo.html` a secas, la URL sería
+`/promo.html` y `/promo` caería en el catch-all que devuelve `index.html`.
+Las dos páginas llevan su CSS y su JS embebidos a propósito: así cambiar el creativo no
+obliga a subir el `?v=N` en los tres sitios de siempre. `/app` sí carga el manifest y
+registra `sw.js`, porque sin eso Chrome no dispara `beforeinstallprompt`.
+
+**Desde otro sitio no se puede instalar esta PWA.** `beforeinstallprompt` solo lo dispara
+el navegador en el propio dominio: no existe API para que una web instale la app de otra.
+Por eso el anuncio de Verifica Venezuela solo puede *llevar* a `/app`, y es ahí donde
+aparece el botón. En iPhone ni siquiera ahí hay prompt — Safari obliga al gesto manual de
+Compartir → Añadir a pantalla de inicio, y la landing lo explica.
+
 **`/.well-known/assetlinks.json` tiene que salir como `application/json`.** Hay una
 `location` dedicada en el vhost. Si se sirve como HTML, la app de Google Play
 (`com.dolarprice.twa`) deja de validar Digital Asset Links y abre con la barra del

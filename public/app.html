@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es-VE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Instalar DolarPrice · dólar BCV y Binance en tu teléfono</title>
+<meta name="description" content="Instala DolarPrice y consulta el dolar BCV y el paralelo de Binance P2P desde la pantalla de inicio, tambien sin señal.">
+<meta name="robots" content="noindex, follow">
+<meta name="theme-color" content="#0B1210">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<style>
+  /* Landing de la campaña. Es autonoma a proposito: no carga styles.css ni
+     app.js, para que un cambio de creativo no obligue a subir el ?v=N de la app.
+     Lo que si necesita, y por eso esta arriba, es el manifest y el registro del
+     service worker: sin eso Chrome no dispara beforeinstallprompt. */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(90% 55% at 50% 0%, rgba(45, 212, 145, 0.18), transparent 65%),
+      #0B1210;
+    color: #E8F0EC;
+    -webkit-font-smoothing: antialiased;
+  }
+  .envoltura { max-width: 520px; margin: 0 auto; padding: 28px 20px 48px; }
+
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 26px; }
+  header .punto {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, #2DD491, #12A36B);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 800; color: #04150E;
+  }
+  header b { font-size: 17px; letter-spacing: -0.3px; }
+
+  h1 { font-size: 27px; line-height: 1.2; letter-spacing: -0.7px; margin: 0 0 10px; }
+  .entrada { margin: 0 0 22px; color: #A6C2B4; font-size: 15px; line-height: 1.55; }
+
+  .tasas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .caja {
+    padding: 13px 14px; border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .caja .etq { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; color: #93B3A4; }
+  .caja .val { display: block; margin-top: 5px; font-size: 22px; font-weight: 800; letter-spacing: -0.6px; font-variant-numeric: tabular-nums; }
+  .caja .val small { font-size: 12px; font-weight: 600; color: #7C9A8C; margin-left: 3px; }
+  .sello { text-align: center; font-size: 12px; color: #7C9A8C; margin: 0 0 26px; }
+  .sello b { color: #2DD491; font-variant-numeric: tabular-nums; }
+
+  .acciones { display: grid; gap: 10px; margin-bottom: 14px; }
+  .btn {
+    display: block; width: 100%; text-align: center;
+    padding: 15px 16px; border-radius: 13px; border: 0;
+    font-family: inherit; font-size: 16px; font-weight: 800; letter-spacing: -0.2px;
+    cursor: pointer; text-decoration: none;
+  }
+  .btn.solido { background: linear-gradient(135deg, #2DD491, #12A36B); color: #04150E; }
+  .btn.fantasma {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #E8F0EC;
+  }
+  .btn:active { transform: translateY(1px); }
+
+  .aviso {
+    padding: 13px 15px; border-radius: 13px; margin-bottom: 14px;
+    background: rgba(45, 212, 145, 0.1);
+    border: 1px solid rgba(45, 212, 145, 0.28);
+    font-size: 14px; line-height: 1.5; color: #C7E6D8;
+  }
+
+  .pasos { margin: 0 0 22px; padding-left: 20px; color: #A6C2B4; font-size: 14px; line-height: 1.7; }
+  .pasos b { color: #E8F0EC; }
+  h2 { font-size: 14px; letter-spacing: 0.3px; text-transform: uppercase; color: #7C9A8C; margin: 26px 0 10px; }
+
+  .ventajas { list-style: none; margin: 0 0 26px; padding: 0; display: grid; gap: 9px; }
+  .ventajas li { display: flex; gap: 9px; font-size: 14px; line-height: 1.5; color: #C7E6D8; }
+  .ventajas li::before { content: '✓'; color: #2DD491; font-weight: 800; flex: none; }
+
+  footer { text-align: center; font-size: 13px; color: #6B8A7C; line-height: 1.7; }
+  footer a { color: #93B3A4; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="envoltura">
+
+  <header>
+    <span class="punto">$</span>
+    <b>DolarPrice</b>
+  </header>
+
+  <h1>El dólar de hoy, en tu pantalla de inicio</h1>
+  <p class="entrada">
+    Tasa oficial del BCV y paralelo de Binance P2P, con conversor e histórico.
+    Se abre como una app y sigue funcionando cuando te quedas sin señal.
+  </p>
+
+  <div class="tasas">
+    <div class="caja">
+      <span class="etq">BCV</span>
+      <span class="val" id="bcv">—<small>Bs</small></span>
+    </div>
+    <div class="caja">
+      <span class="etq">BINANCE P2P</span>
+      <span class="val" id="binance">—<small>Bs</small></span>
+    </div>
+  </div>
+  <p class="sello" id="sello">Cargando la cotización…</p>
+
+  <div class="acciones">
+    <button class="btn solido" id="btn-install" hidden>Instalar la app</button>
+    <a class="btn solido" id="btn-abrir" href="/">Abrir DolarPrice</a>
+    <a class="btn fantasma" id="btn-apk" href="/descargas/DolarPrice.apk" download hidden>Descargar APK para Android</a>
+  </div>
+
+  <div class="aviso" id="aviso-instalada" hidden>
+    Ya la tienes instalada. Ábrela desde la pantalla de inicio de tu teléfono.
+  </div>
+
+  <div id="ayuda-ios" hidden>
+    <h2>Cómo instalarla en iPhone</h2>
+    <ol class="pasos">
+      <li>Abre esta página en <b>Safari</b>.</li>
+      <li>Toca el botón <b>Compartir</b>, el cuadrado con la flecha hacia arriba.</li>
+      <li>Elige <b>Añadir a pantalla de inicio</b>.</li>
+    </ol>
+  </div>
+
+  <div id="ayuda-escritorio" hidden>
+    <h2>Cómo instalarla en la computadora</h2>
+    <ol class="pasos">
+      <li>En Chrome o Edge, busca el ícono de <b>instalar</b> al final de la barra de direcciones.</li>
+      <li>También está en el menú de tres puntos, en <b>Instalar DolarPrice</b>.</li>
+    </ol>
+  </div>
+
+  <h2>Por qué instalarla</h2>
+  <ul class="ventajas">
+    <li>Abre de una vez, sin escribir la dirección ni esperar la carga.</li>
+    <li>Guarda la última cotización y te la muestra aunque estés sin datos.</li>
+    <li>Convierte bolívares a dólares y al revés, con la tasa que elijas.</li>
+    <li>Histórico de los últimos días para ver cómo viene la brecha.</li>
+    <li>Ocupa poquísimo: es la web, no una descarga de la tienda.</li>
+  </ul>
+
+  <footer>
+    <a href="/">Ir al sitio completo</a><br>
+    Las noticias que ves en la app las publica
+    <a href="https://verificavenezuela.org" target="_blank" rel="noopener">Verifica Venezuela</a>.
+  </footer>
+
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id)
+
+/* ─── cotización en vivo ─── */
+;(async () => {
+  const bs = (n) => n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  try {
+    const r = await fetch('/api/v1/rates', { headers: { Accept: 'application/json' } })
+    if (!r.ok) throw new Error()
+    const d = await r.json()
+
+    if (d.bcv?.monedas?.USD) $('bcv').innerHTML = bs(d.bcv.monedas.USD) + '<small>Bs</small>'
+    if (d.binance?.promedio) $('binance').innerHTML = bs(d.binance.promedio) + '<small>Bs</small>'
+
+    const min = Math.round((d.edadSegundos ?? 0) / 60)
+    const cuando = d.desactualizado ? 'último dato disponible' : (min < 1 ? 'actualizado ahora mismo' : `actualizado hace ${min} min`)
+    $('sello').innerHTML = d.brecha
+      ? `Brecha <b>${d.brecha.porcentaje.toFixed(2).replace('.', ',')} %</b> · ${cuando}`
+      : cuando
+  } catch {
+    $('sello').textContent = 'No pudimos cargar la cotización ahora mismo.'
+  }
+})()
+
+/* ─── instalación ─── */
+
+// Mismo criterio que usa la app: si ya viene abierta como aplicacion no tiene
+// sentido ofrecer instalarla otra vez.
+function corriendoComoApp() {
+  return (
+    ['standalone', 'fullscreen', 'minimal-ui'].some((m) => matchMedia(`(display-mode: ${m})`).matches) ||
+    navigator.standalone === true ||
+    document.referrer.startsWith('android-app://')
+  )
+}
+
+const ua = navigator.userAgent
+const esAndroid = /Android/i.test(ua)
+const esIOS = /iPad|iPhone|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+const esMovil = esAndroid || esIOS
+
+if (corriendoComoApp()) {
+  $('aviso-instalada').hidden = false
+} else if (esIOS) {
+  // Safari no expone beforeinstallprompt: la unica via es explicar el gesto.
+  $('ayuda-ios').hidden = false
+} else if (!esMovil) {
+  $('ayuda-escritorio').hidden = false
+}
+
+// El APK es el plan B de Android: pesa 1 MB y obliga a permitir origenes
+// desconocidos, asi que solo se ofrece cuando de verdad hace falta.
+if (esAndroid && !corriendoComoApp()) $('btn-apk').hidden = false
+
+let promptInstalar = null
+
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault()
+  promptInstalar = e
+  $('btn-install').hidden = false
+  $('btn-abrir').classList.replace('solido', 'fantasma')
+})
+
+$('btn-install').addEventListener('click', async () => {
+  if (!promptInstalar) return
+  promptInstalar.prompt()
+  const { outcome } = await promptInstalar.userChoice
+  promptInstalar = null
+  $('btn-install').hidden = true
+  if (outcome === 'accepted') $('aviso-instalada').hidden = false
+})
+
+addEventListener('appinstalled', () => {
+  $('btn-install').hidden = true
+  $('btn-apk').hidden = true
+  $('aviso-instalada').hidden = false
+})
+
+// Chrome exige un service worker con handler de fetch para considerar la web
+// instalable. Es el mismo de la app, no uno aparte.
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
+}
+
+// Se arrastra la campaña hasta el sitio para poder medirla despues.
+;(() => {
+  const p = new URLSearchParams(location.search)
+  if (!p.get('utm_source')) return
+  const destino = $('btn-abrir')
+  destino.href = '/?' + p.toString()
+})()
+</script>
+
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es-VE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DolarPrice · tasas de hoy</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
+<style>
+  /* Creativo compacto pensado para ir dentro de un iframe de ~300x300 en
+     verificavenezuela.org. Todo va aqui embebido: nada de styles.css ni app.js,
+     que pesan de mas y arrastrarian el ?v=N de la app. */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #0B1210;
+    color: #E8F0EC;
+    display: flex;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { text-decoration: none; color: inherit; }
+
+  .tarjeta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    background:
+      radial-gradient(120% 80% at 100% 0%, rgba(45, 212, 145, 0.16), transparent 60%),
+      #0B1210;
+  }
+
+  .marca { display: flex; align-items: center; gap: 7px; }
+  .marca .punto {
+    width: 22px; height: 22px; border-radius: 7px;
+    background: linear-gradient(135deg, #2DD491, #12A36B);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; color: #04150E;
+  }
+  .marca b { font-size: 14px; letter-spacing: -0.2px; }
+  .marca span { margin-left: auto; font-size: 10px; color: #7C9A8C; }
+
+  .tasas { display: grid; gap: 7px; }
+  .fila {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 9px 11px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .fila .etq { font-size: 11px; color: #93B3A4; font-weight: 600; letter-spacing: 0.3px; }
+  .fila .val { margin-left: auto; font-size: 19px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+  .fila .bs { font-size: 10px; color: #7C9A8C; font-weight: 600; }
+
+  .brecha {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 11px; color: #93B3A4;
+  }
+  .brecha b { color: #2DD491; font-variant-numeric: tabular-nums; }
+
+  .cta {
+    margin-top: auto;
+    display: block;
+    text-align: center;
+    padding: 11px 12px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, #2DD491, #12A36B);
+    color: #04150E;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+  }
+  .cta:active { transform: translateY(1px); }
+
+  .pie { text-align: center; font-size: 10px; color: #6B8A7C; }
+  .pie a { text-decoration: underline; text-underline-offset: 2px; }
+
+  .cargando .val, .cargando .brecha b { color: #4A6659; }
+</style>
+</head>
+<body>
+
+<a class="tarjeta cargando" id="tarjeta" href="/app?utm_source=verificavenezuela&utm_medium=interstitial&utm_campaign=casa" target="_blank" rel="noopener">
+
+  <div class="marca">
+    <span class="punto">$</span>
+    <b>DolarPrice</b>
+    <span id="sello">tasas de hoy</span>
+  </div>
+
+  <div class="tasas">
+    <div class="fila">
+      <span class="etq">BCV</span>
+      <span class="val" id="bcv">—</span>
+      <span class="bs">Bs</span>
+    </div>
+    <div class="fila">
+      <span class="etq">BINANCE P2P</span>
+      <span class="val" id="binance">—</span>
+      <span class="bs">Bs</span>
+    </div>
+  </div>
+
+  <div class="brecha">Brecha <b id="brecha">—</b></div>
+
+  <span class="cta">Instalar la app gratis</span>
+
+  <div class="pie">Conversor, histórico y alertas · <span>dolarprice.com</span></div>
+
+</a>
+
+<script>
+// El creativo se sirve desde el mismo origen que la API, asi que no hace falta
+// CORS. Si la peticion falla, la tarjeta se queda con los guiones y el enlace
+// sigue funcionando: nunca se muestra un anuncio roto.
+(async () => {
+  const $ = (id) => document.getElementById(id)
+  const bs = (n) => n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  try {
+    const r = await fetch('/api/v1/rates', { headers: { Accept: 'application/json' } })
+    if (!r.ok) return
+    const d = await r.json()
+
+    if (d.bcv?.monedas?.USD) $('bcv').textContent = bs(d.bcv.monedas.USD)
+    if (d.binance?.promedio) $('binance').textContent = bs(d.binance.promedio)
+    if (d.brecha) $('brecha').textContent = d.brecha.porcentaje.toFixed(2).replace('.', ',') + ' %'
+
+    const min = Math.round((d.edadSegundos ?? 0) / 60)
+    $('sello').textContent = d.desactualizado ? 'último dato' : (min < 1 ? 'ahora mismo' : `hace ${min} min`)
+
+    $('tarjeta').classList.remove('cargando')
+  } catch {}
+})()
+</script>
+
+</body>
+</html>

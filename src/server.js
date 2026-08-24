@@ -3,6 +3,7 @@ import fastifyStatic from '@fastify/static'
 import { join } from 'node:path'
 import { config, ROOT } from './config.js'
 import apiRoutes from './routes/api.js'
+import pagesRoutes from './routes/pages.js'
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL || 'info' },
@@ -29,6 +30,9 @@ await app.register(fastifyStatic, {
     }
   },
 })
+
+// Despues de @fastify/static: estas rutas usan reply.sendFile().
+await app.register(pagesRoutes)
 
 // Cualquier ruta desconocida devuelve la app (SPA), salvo bajo /api.
 app.setNotFoundHandler((req, reply) => {
