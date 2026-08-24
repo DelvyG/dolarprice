@@ -404,8 +404,8 @@ function irA(nombre) {
 
 $$('.tab').forEach((t) => t.addEventListener('click', () => { vibrar(); irA(t.dataset.tab) }))
 
-const tabInicial = new URLSearchParams(location.search).get('tab')
-if (tabInicial && ['inicio', 'monedas', 'noticias', 'historial'].includes(tabInicial)) irA(tabInicial)
+// La pestaña inicial se abre al final del archivo: irA() puede disparar la
+// carga de noticias o del histórico, y sus variables se declaran más abajo.
 
 /* ─── noticias ─── */
 
@@ -634,6 +634,11 @@ try {
 
 cargar()
 setInterval(() => { if (document.visibilityState === 'visible') cargar() }, 300000)
+
+// Permite entrar directo a una pestaña con ?tab=noticias, que es lo que usan
+// los accesos directos del manifiesto.
+const tabInicial = new URLSearchParams(location.search).get('tab')
+if (tabInicial && ['inicio', 'monedas', 'noticias', 'historial'].includes(tabInicial)) irA(tabInicial)
 
 if ('serviceWorker' in navigator) {
   addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
