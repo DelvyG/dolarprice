@@ -468,9 +468,6 @@ evaluarInvitacion()
 // Las publica verificavenezuela.org; aqui solo se listan y se abren alla.
 const VEREDICTOS = {
   verificado: ['Verificado', 'ok'],
-  falso: ['Falso', 'mal'],
-  enganoso: ['Engañoso', 'ojo'],
-  parcialmente_verdadero: ['Parcialmente cierto', 'ojo'],
 }
 
 let noticiasCargadas = false

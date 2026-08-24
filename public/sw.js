@@ -5,7 +5,7 @@
    hay senal, de modo que siempre se ve algo -- aunque sea viejo, y la interfaz
    avisa cuando lo es. */
 
-const VERSION = 'v2.3.1'
+const VERSION = 'v2.3.2'
 const CACHE_SHELL = `dp-shell-${VERSION}`
 const CACHE_DATOS = `dp-datos-${VERSION}`
 
@@ -13,7 +13,7 @@ const SHELL = [
   '/',
   '/index.html',
   '/styles.css?v=9',
-  '/app.js?v=10',
+  '/app.js?v=11',
   '/manifest.webmanifest',
   '/icons/icon-96.png',
   '/icons/icon-192.png',
