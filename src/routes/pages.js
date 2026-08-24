@@ -11,16 +11,13 @@
 // puede quitarselo. Ver el bloque `location = /promo` en
 // deploy/nginx-dolarprice.conf.
 export default async function pagesRoutes(app) {
+  // El Cache-Control de estas dos lo pone el vhost: @fastify/static escribe el
+  // suyo propio al servir el archivo y pisa cualquier reply.header() previo.
+
   // Creativo que se embebe en el interstitial de verificavenezuela.org.
-  app.get('/promo', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=120')
-    return reply.type('text/html').sendFile('promo.html')
-  })
+  app.get('/promo', async (req, reply) => reply.type('text/html').sendFile('promo.html'))
 
   // Landing de la campaña: aqui es donde de verdad se instala la PWA, porque
   // beforeinstallprompt solo lo dispara Chrome en el propio dominio.
-  app.get('/app', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=300')
-    return reply.type('text/html').sendFile('app.html')
-  })
+  app.get('/app', async (req, reply) => reply.type('text/html').sendFile('app.html'))
 }
