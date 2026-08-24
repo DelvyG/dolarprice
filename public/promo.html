@@ -6,6 +6,14 @@
 <title>DolarPrice · tasas de hoy</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
+<script>
+  // Antes de pintar, para que no se vea el salto de oscuro a claro.
+  // ?estilo=inline lo usa el bloque dentro de los articulos de economia;
+  // sin parametro sale la tarjeta oscura del interstitial.
+  if (new URLSearchParams(location.search).get('estilo') === 'inline') {
+    document.documentElement.dataset.estilo = 'inline'
+  }
+</script>
 <style>
   /* Creativo compacto pensado para ir dentro de un iframe de ~300x300 en
      verificavenezuela.org. Todo va aqui embebido: nada de styles.css ni app.js,
@@ -78,11 +86,65 @@
   .pie a { text-decoration: underline; text-underline-offset: 2px; }
 
   .cargando .val, .cargando .brecha b { color: #4A6659; }
+
+  /* ─── variante clara y horizontal, para ir dentro del articulo ───
+     Va como sobrescritura y no como hoja aparte porque comparte el 90 % de las
+     reglas; lo unico que cambia de verdad es la paleta y la direccion. */
+  [data-estilo="inline"] body { background: transparent; color: #0F1B16; }
+  [data-estilo="inline"] .tarjeta {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #F1FAF5, #E7F5EE);
+    border: 1px solid #CBE7D9;
+    border-radius: 14px;
+  }
+  [data-estilo="inline"] .marca { flex: 1 1 100%; }
+  [data-estilo="inline"] .marca b { color: #0F1B16; }
+  [data-estilo="inline"] .marca span { color: #5C7A6C; }
+
+  [data-estilo="inline"] .tasas {
+    flex: 1 1 200px;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  [data-estilo="inline"] .fila {
+    display: block;
+    background: #FFFFFF;
+    border-color: #D6EADF;
+    padding: 8px 10px;
+  }
+  [data-estilo="inline"] .fila .etq { color: #5C7A6C; }
+  [data-estilo="inline"] .fila .val { display: block; margin-left: 0; font-size: 18px; color: #0F1B16; }
+  [data-estilo="inline"] .fila .bs { color: #5C7A6C; }
+
+  [data-estilo="inline"] .brecha { flex: 1 1 100%; justify-content: flex-start; color: #5C7A6C; }
+  [data-estilo="inline"] .brecha b { color: #0E8C5C; }
+
+  [data-estilo="inline"] .cta {
+    margin-top: 0;
+    flex: 0 0 auto;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    padding: 12px 18px;
+  }
+  [data-estilo="inline"] .pie { display: none; }
+  [data-estilo="inline"] .cargando .val, [data-estilo="inline"] .cargando .brecha b { color: #A8C4B6; }
+
+  @media (max-width: 400px) {
+    [data-estilo="inline"] .cta { flex: 1 1 100%; justify-content: center; }
+  }
 </style>
 </head>
 <body>
 
-<a class="tarjeta cargando" id="tarjeta" href="/app?utm_source=verificavenezuela&utm_medium=interstitial&utm_campaign=casa" target="_blank" rel="noopener">
+<!-- El href definitivo lo arma el script con los utm_* que traiga la URL; este
+     es el respaldo por si algo falla antes. target=_blank porque esto vive
+     dentro de un iframe en otro dominio. -->
+<a class="tarjeta cargando" id="tarjeta" href="/app" target="_blank" rel="noopener">
 
   <div class="marca">
     <span class="punto">$</span>
@@ -105,7 +167,7 @@
 
   <div class="brecha">Brecha <b id="brecha">—</b></div>
 
-  <span class="cta">Instalar la app gratis</span>
+  <span class="cta" id="cta">Instalar la app gratis</span>
 
   <div class="pie">Conversor, histórico y alertas · <span>dolarprice.com</span></div>
 
@@ -115,8 +177,23 @@
 // El creativo se sirve desde el mismo origen que la API, asi que no hace falta
 // CORS. Si la peticion falla, la tarjeta se queda con los guiones y el enlace
 // sigue funcionando: nunca se muestra un anuncio roto.
-(async () => {
-  const $ = (id) => document.getElementById(id)
+const $ = (id) => document.getElementById(id)
+
+// La campaña la decide quien embebe el creativo, no este archivo: se toman los
+// utm_* de la propia URL y se arrastran hasta /app para poder medir por sitio.
+;(() => {
+  const entrada = new URLSearchParams(location.search)
+  const salida = new URLSearchParams()
+  for (const [k, v] of entrada) if (k.startsWith('utm_')) salida.set(k, v)
+  if (!salida.has('utm_source')) salida.set('utm_source', 'promo')
+  $('tarjeta').href = '/app?' + salida.toString()
+
+  // Dentro de un articulo el gancho es la tasa, no la instalacion: esa se
+  // ofrece igual al llegar a /app.
+  if (entrada.get('estilo') === 'inline') $('cta').textContent = 'Ver la cotización'
+})()
+
+;(async () => {
   const bs = (n) => n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   try {
