@@ -266,21 +266,77 @@ function teclear(k) {
 
 $$('#pad .key').forEach((b) => b.addEventListener('click', () => teclear(b.dataset.k)))
 
+/* ─── panel del teclado ─── */
+
+const hoja = $('#sheet')
+const velo = $('#scrim')
+
+function abrirTeclado() {
+  if (hoja.classList.contains('open')) return
+  velo.hidden = false
+  requestAnimationFrame(() => velo.classList.add('show'))
+  hoja.classList.add('open')
+  hoja.setAttribute('aria-hidden', 'false')
+  $('#scroll').classList.add('sheet-abierto')
+
+  // Deja los dos montos justo encima del panel, sin que los tape.
+  requestAnimationFrame(() => {
+    const techo = innerHeight - hoja.offsetHeight
+    const fondo = $('#row-b').getBoundingClientRect().bottom
+    const sobra = fondo - (techo - 14)
+    if (sobra > 0) scrollBy({ top: sobra, behavior: 'smooth' })
+  })
+}
+
+function cerrarTeclado() {
+  if (!hoja.classList.contains('open')) return
+  hoja.classList.remove('open')
+  hoja.setAttribute('aria-hidden', 'true')
+  velo.classList.remove('show')
+  setTimeout(() => { velo.hidden = true }, 300)
+  $('#scroll').classList.remove('sheet-abierto')
+}
+
+$('#btn-done').addEventListener('click', () => { vibrar(); cerrarTeclado() })
+velo.addEventListener('click', cerrarTeclado)
+addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarTeclado() })
+
+// Arrastrar el panel hacia abajo tambien lo cierra.
+let arrastreY = null
+hoja.addEventListener('touchstart', (e) => {
+  if (e.target.closest('.key')) return
+  arrastreY = e.touches[0].clientY
+}, { passive: true })
+
+hoja.addEventListener('touchmove', (e) => {
+  if (arrastreY === null) return
+  const dy = e.touches[0].clientY - arrastreY
+  if (dy > 0) hoja.style.transform = `translateY(${dy}px)`
+}, { passive: true })
+
+hoja.addEventListener('touchend', (e) => {
+  if (arrastreY === null) return
+  const dy = e.changedTouches[0].clientY - arrastreY
+  arrastreY = null
+  hoja.style.transform = ''
+  if (dy > 70) { vibrar(); cerrarTeclado() }
+})
+
 // El teclado físico también funciona, útil en escritorio.
 addEventListener('keydown', (e) => {
   if ($('.tabpane[data-pane="inicio"]').hidden) return
   if (/^[0-9]$/.test(e.key)) teclear(e.key)
   else if (e.key === ',' || e.key === '.') teclear(',')
   else if (e.key === 'Backspace') teclear('del')
-  else if (e.key === 'Escape') limpiar()
+  // Escape lo maneja el panel del teclado, no limpia el monto.
 })
 
 const limpiar = () => { estado.crudo = ''; calcular() }
 
 $('#btn-clear').addEventListener('click', () => { vibrar(); limpiar() })
 
-$('#row-a').addEventListener('click', () => { if (estado.fila !== 'a') cambiarFila('a') })
-$('#row-b').addEventListener('click', () => { if (estado.fila !== 'b') cambiarFila('b') })
+$('#row-a').addEventListener('click', () => { if (estado.fila !== 'a') cambiarFila('a'); abrirTeclado() })
+$('#row-b').addEventListener('click', () => { if (estado.fila !== 'b') cambiarFila('b'); abrirTeclado() })
 
 function cambiarFila(fila) {
   vibrar()
@@ -333,6 +389,7 @@ $('#btn-share').addEventListener('click', async () => {
 /* ─── pestañas ─── */
 
 function irA(nombre) {
+  cerrarTeclado()
   $$('.tabpane').forEach((p) => { p.hidden = p.dataset.pane !== nombre })
   $$('.tab').forEach((t) => {
     const activa = t.dataset.tab === nombre
@@ -447,6 +504,8 @@ let tocoY = 0, tirando = false
 const pull = $('#pull')
 
 addEventListener('touchstart', (e) => {
+  // Con el teclado abierto manda el arrastre del panel, no el de recargar.
+  if (hoja.classList.contains('open')) return
   if (scrollY <= 0) { tocoY = e.touches[0].clientY; tirando = true }
 }, { passive: true })
 

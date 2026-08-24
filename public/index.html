@@ -17,7 +17,7 @@
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
-<link rel="stylesheet" href="/styles.css?v=3">
+<link rel="stylesheet" href="/styles.css?v=4">
 <meta property="og:title" content="DolarPrice · Dólar BCV y paralelo">
 <meta property="og:description" content="Precio del dólar BCV y del paralelo Binance P2P en Venezuela.">
 <meta property="og:type" content="website">
@@ -90,14 +90,6 @@
         </button>
       </div>
 
-      <div class="pad" id="pad">
-        <button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button>
-        <button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button>
-        <button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button>
-        <button class="key key-alt" data-k=",">,</button><button class="key" data-k="0">0</button>
-        <button class="key key-alt" data-k="del" aria-label="Borrar"><svg viewBox="0 0 24 24" class="i"><path d="M21 5H8l-5 7 5 7h13a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="m18 9-6 6"/><path d="m12 9 6 6"/></svg></button>
-      </div>
-
       <div class="conv-acts">
         <button class="btn ghost" id="btn-clear">Limpiar</button>
         <button class="btn solid" id="btn-share">Compartir</button>
@@ -146,8 +138,24 @@
   </button>
 </nav>
 
+<!-- Teclado en panel: sube solo cuando se toca un monto, para que la pantalla
+     en reposo entre completa sin scroll. -->
+<div class="scrim" id="scrim" hidden></div>
+
+<div class="sheet" id="sheet" aria-hidden="true">
+  <div class="sheet-grip" id="sheet-grip"></div>
+  <div class="pad" id="pad">
+    <button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button>
+    <button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button>
+    <button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button>
+    <button class="key key-alt" data-k=",">,</button><button class="key" data-k="0">0</button>
+    <button class="key key-alt" data-k="del" aria-label="Borrar"><svg viewBox="0 0 24 24" class="i"><path d="M21 5H8l-5 7 5 7h13a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="m18 9-6 6"/><path d="m12 9 6 6"/></svg></button>
+  </div>
+  <button class="btn solid sheet-done" id="btn-done">Listo</button>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/app.js?v=3" type="module"></script>
+<script src="/app.js?v=4" type="module"></script>
 </body>
 </html>
