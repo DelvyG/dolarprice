@@ -15,15 +15,17 @@ await app.register(fastifyStatic, {
   root: join(ROOT, 'public'),
   index: ['index.html'],
   dotfiles: 'allow', // hace falta para servir /.well-known/assetlinks.json
-  setHeaders(res, path) {
+  // Ojo: desde @fastify/static v10 el primer argumento es un FastifyReply, no la
+  // respuesta cruda de Node. Va reply.header(), no res.setHeader().
+  setHeaders(reply, path) {
     if (path.endsWith('assetlinks.json')) {
       // Digital Asset Links exige application/json o la app de Play no valida.
-      res.setHeader('Content-Type', 'application/json')
-      res.setHeader('Cache-Control', 'public, max-age=3600')
+      reply.header('Content-Type', 'application/json')
+      reply.header('Cache-Control', 'public, max-age=3600')
     } else if (path.endsWith('sw.js')) {
-      res.setHeader('Cache-Control', 'no-cache')
+      reply.header('Cache-Control', 'no-cache')
     } else if (/\.(png|svg|webp|woff2)$/.test(path)) {
-      res.setHeader('Cache-Control', 'public, max-age=604800')
+      reply.header('Cache-Control', 'public, max-age=604800')
     }
   },
 })
