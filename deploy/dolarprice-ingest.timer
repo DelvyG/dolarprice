@@ -1,0 +1,12 @@
+[Unit]
+Description=Captura las tasas cada 10 minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+RandomizedDelaySec=45
+Persistent=true
+Unit=dolarprice-ingest.service
+
+[Install]
+WantedBy=timers.target

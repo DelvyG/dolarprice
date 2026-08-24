@@ -1,0 +1,20 @@
+name: Desplegar a produccion
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preparar llave SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 158.220.110.201 >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Desplegar
+        run: ssh -i ~/.ssh/id_ed25519 root@158.220.110.201 dolarprice-deploy

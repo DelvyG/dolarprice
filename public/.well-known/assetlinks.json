@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.dolarprice.twa",
+      "sha256_cert_fingerprints": [
+        "CA:19:B6:F2:5E:8F:02:8D:CD:4A:D7:8F:3E:D9:C5:DE:40:E4:39:46:85:BA:4A:8D:E8:95:C2:7E:D2:E7:17:F8"
+      ]
+    }
+  }
+]

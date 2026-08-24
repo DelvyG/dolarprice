@@ -1,0 +1,24 @@
+[Unit]
+Description=DolarPrice - API y web (Fastify)
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dolarprice
+Group=dolarprice
+WorkingDirectory=/var/www/dolarprice
+ExecStart=/usr/bin/node src/server.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/dolarprice
+
+[Install]
+WantedBy=multi-user.target

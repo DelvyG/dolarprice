@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Despliegue de DolarPrice. Vive en /usr/local/bin/dolarprice-deploy y lo invoca
+# GitHub Actions por SSH con una llave restringida a este unico comando.
+set -euo pipefail
+
+RUTA=/var/www/dolarprice
+RAMA=main
+
+echo "==> Desplegando DolarPrice"
+cd "$RUTA"
+
+# .env nunca esta en el repo: se conserva el del servidor.
+sudo -u dolarprice git fetch --prune origin "$RAMA"
+sudo -u dolarprice git reset --hard "origin/$RAMA"
+
+echo "==> Dependencias"
+sudo -u dolarprice npm ci --omit=dev
+
+echo "==> Esquema de base de datos"
+sudo -u dolarprice node scripts/migrate.js
+
+echo "==> Reiniciando servicio"
+systemctl restart dolarprice
+sleep 2
+
+echo "==> Comprobacion"
+CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 http://127.0.0.1:3200/api/v1/health)
+if [ "$CODIGO" != "200" ]; then
+  echo "FALLO: la API responde $CODIGO" >&2
+  systemctl status dolarprice --no-pager | tail -20
+  exit 1
+fi
+
+echo "==> Listo. API 200."
