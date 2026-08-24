@@ -407,6 +407,62 @@ $$('.tab').forEach((t) => t.addEventListener('click', () => { vibrar(); irA(t.da
 // La pestaña inicial se abre al final del archivo: irA() puede disparar la
 // carga de noticias o del histórico, y sus variables se declaran más abajo.
 
+/* ─── invitación a instalar ─── */
+
+// Solo tiene sentido ofrecerla a quien entra por el navegador desde Android.
+// Quien ya abrió la app instalada -PWA o la TWA de Android- no la ve nunca.
+const CLAVE_INSTALL = 'dolarprice.install.oculto'
+
+function corriendoComoApp() {
+  return (
+    ['standalone', 'fullscreen', 'minimal-ui'].some((m) => matchMedia(`(display-mode: ${m})`).matches) ||
+    navigator.standalone === true ||
+    document.referrer.startsWith('android-app://')
+  )
+}
+
+let promptInstalar = null
+
+function evaluarInvitacion() {
+  const esAndroid = /Android/i.test(navigator.userAgent)
+  const oculto = localStorage.getItem(CLAVE_INSTALL) === '1'
+  $('#get-app').hidden = !(esAndroid && !corriendoComoApp() && !oculto)
+}
+
+// Chrome avisa cuando la web cumple los requisitos para instalarse. Instalar la
+// PWA es mejor que el APK: no pide permitir origenes desconocidos, no descarga
+// 1 MB y se actualiza sola con el sitio. El APK queda como alternativa.
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault()
+  promptInstalar = e
+  $('#btn-install').hidden = false
+})
+
+$('#btn-install').addEventListener('click', async () => {
+  if (!promptInstalar) return
+  vibrar()
+  promptInstalar.prompt()
+  const { outcome } = await promptInstalar.userChoice
+  promptInstalar = null
+  $('#btn-install').hidden = true
+  if (outcome === 'accepted') $('#get-app').hidden = true
+})
+
+$('#get-close').addEventListener('click', () => {
+  vibrar()
+  localStorage.setItem(CLAVE_INSTALL, '1')
+  $('#get-app').hidden = true
+})
+
+$('#btn-apk').addEventListener('click', () => toast('Descargando… ábrelo cuando termine'))
+
+addEventListener('appinstalled', () => {
+  $('#get-app').hidden = true
+  toast('Listo, ya la tienes instalada')
+})
+
+evaluarInvitacion()
+
 /* ─── noticias ─── */
 
 // Las publica verificavenezuela.org; aqui solo se listan y se abren alla.

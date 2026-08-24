@@ -17,7 +17,7 @@
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
-<link rel="stylesheet" href="/styles.css?v=6">
+<link rel="stylesheet" href="/styles.css?v=9">
 <meta property="og:title" content="DolarPrice · Dólar BCV y paralelo">
 <meta property="og:description" content="Precio del dólar BCV y del paralelo Binance P2P en Venezuela.">
 <meta property="og:type" content="website">
@@ -96,6 +96,23 @@
       </div>
     </section>
 
+    <!-- Solo aparece en Android y abierta desde el navegador: quien ya tiene la
+         app instalada no la ve nunca. La detección está en app.js. -->
+    <section class="get" id="get-app" hidden>
+      <button class="get-x" id="get-close" aria-label="Ocultar">&times;</button>
+      <div class="get-top">
+        <img src="/icons/icon-96.png" alt="" width="34" height="34">
+        <div class="get-txt">
+          <strong>Tenla en tu teléfono</strong>
+          <span>Se abre desde la pantalla de inicio y funciona sin señal.</span>
+        </div>
+      </div>
+      <div class="get-acts">
+        <button class="btn solid" id="btn-install" hidden>Instalar</button>
+        <a class="btn ghost" id="btn-apk" href="/descargas/DolarPrice.apk" download>Descargar APK</a>
+      </div>
+    </section>
+
     <p class="stamp" id="stamp">Cargando…</p>
   </section>
 
@@ -167,6 +184,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/app.js?v=8" type="module"></script>
+<script src="/app.js?v=9" type="module"></script>
 </body>
 </html>
