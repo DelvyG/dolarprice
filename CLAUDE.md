@@ -62,6 +62,13 @@ navegador visible. Era uno de los fallos de la versión anterior.
 
 **nginx 1.24 no acepta `http2 on;`** — va `listen 443 ssl http2;`.
 
+**El APK no está en el repo.** Vive en `public/descargas/DolarPrice.apk` del servidor y
+está en `.gitignore` por ser un binario de 1 MB. `git reset --hard` no lo borra porque
+está ignorado, así que sobrevive a los despliegues — **pero un servidor nuevo no lo
+tendría**: hay que volver a subirlo desde
+`F:\Archivos\Proyecto Cambios\DolarPrice - Google Play package\DolarPrice.apk`.
+Se sirve como `application/octet-stream`, que basta para que el navegador lo descargue.
+
 ## Desarrollo en local
 
 El `.env` local apunta a la base de producción **a través de un túnel SSH** (por eso
@@ -83,7 +90,11 @@ hay que correr si se sospecha que el BCV cambió su HTML.
   captura, cantidad de anuncios) hoy son variables del `.env`. Si se vuelve a querer un
   panel, hay que hacerlo de cero.
 - **No se migró el histórico viejo.** Eran tasas de hace meses y además equivocadas.
-- **No se tocó el paquete de Google Play.** Sigue sirviendo el mismo `com.dolarprice.twa`
-  ya firmado; el keystore está en `F:\Archivos\Proyecto Cambios\DolarPrice - Google Play
-  package`. Al mantener el dominio y arreglar `assetlinks.json`, la app existente empieza
-  a funcionar a pantalla completa sin publicar una versión nueva.
+- **No se tocó el paquete de Android.** Es una **TWA** hecha con PWABuilder (contiene
+  `TrustedWebActivity` y `androidbrowserhelper`, apunta a `https://dolarprice.com`), no un
+  WebView: corre el motor real de Chrome, así que hereda el service worker y el offline.
+  El keystore está en `F:\Archivos\Proyecto Cambios\DolarPrice - Google Play package`.
+  **No está publicada en Google Play** — la ficha de `com.dolarprice.twa` da 404. Se
+  distribuye descargando el APK desde el propio sitio. Al arreglar `assetlinks.json` la
+  TWA valida Digital Asset Links y abre a pantalla completa, sin la barra del navegador,
+  también instalada a mano.
