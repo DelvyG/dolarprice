@@ -42,6 +42,25 @@ estaba en `918`. Un promedio simple de los 20 se iba unos 5 Bs por encima del pr
 al que de verdad se puede operar. El porcentaje de recorte se ajusta con
 `BINANCE_TRIM_PCT` (poner `0` da el promedio simple de los 20).
 
+### Noticias
+
+La pestaña de noticias las toma de **verificavenezuela.org**, un verificador de
+información que corre en el mismo servidor sobre PostgreSQL. Ese sitio no expone una API
+de noticias, solo rutas web, así que en vez de agregarle código y desplegarlo —está en
+producción— se lee su base con un rol de PostgreSQL que tiene **`SELECT` únicamente sobre
+`news`, `media` y `categories`**. Ese proyecto no se toca en absoluto.
+
+Las noticias se copian a la base de DolarPrice cada 20 minutos, en un timer aparte del de
+las tasas: si una fuente falla, la otra no se entera. Y si verificavenezuela cae o cambia
+su esquema, la pestaña sigue mostrando la última copia.
+
+Las portadas usan las miniaturas WebP que ese sitio ya genera (unos 13 KB) en lugar de los
+originales (unos 270 KB): con 40 noticias son 0,5 MB en vez de 10 MB.
+
+Al tocar una noticia se abre en verificavenezuela.org, no dentro de DolarPrice. Es
+deliberado: ahí están sus anuncios y su contador de visitas, y evita duplicar el mismo
+contenido en dos dominios.
+
 ### Nunca se inventa una tasa
 
 Si una fuente falla, **no** se sustituye por un valor por defecto ni se deja el último
@@ -85,6 +104,7 @@ respondiendo igual de rápido.
 |---|---|
 | `GET /api/v1/rates` | Todas las tasas actuales, la brecha y la antigüedad del dato. |
 | `GET /api/v1/history?code=USD&days=30` | Un punto por día. `code` acepta `USD`, `EUR`, `CNY`, `TRY`, `RUB` y `USDT`. |
+| `GET /api/v1/news?limit=30` | Últimas noticias de verificavenezuela.org con su veredicto. |
 | `GET /api/v1/health` | Cuántas tasas hay cargadas y las últimas corridas del capturador. |
 
 ```jsonc

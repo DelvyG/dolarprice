@@ -469,6 +469,17 @@ async function cargarNoticias() {
       })
       .join('')
 
+    // Alguna portada puede faltar en disco aunque la base diga que existe.
+    // Sin esto queda el icono de imagen rota del navegador.
+    cont.querySelectorAll('.new-img').forEach((img) => {
+      img.addEventListener('error', () => {
+        const hueco = document.createElement('div')
+        hueco.className = 'new-img vacia'
+        hueco.textContent = '📰'
+        img.replaceWith(hueco)
+      }, { once: true })
+    })
+
     $('#news-sub').textContent = `Verificadas por verificavenezuela.org · ${noticias.length} publicadas`
     noticiasCargadas = true
     if (sincronizado) console.log('noticias sincronizadas', sincronizado)

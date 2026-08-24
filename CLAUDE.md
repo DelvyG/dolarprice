@@ -16,7 +16,7 @@ está en ese documento, y el respaldo de `/etc/nginx` de antes de este proyecto 
 | Servidor | Contabo `158.220.110.201`, puerto 22 |
 | Ruta | `/var/www/dolarprice` (checkout de git, dueño `dolarprice:dolarprice`) |
 | Runtime | Node 22 + Fastify en `127.0.0.1:3200` |
-| Servicios | `dolarprice.service` · `dolarprice-ingest.timer` (cada 10 min) |
+| Servicios | `dolarprice.service` · `dolarprice-ingest.timer` (10 min) · `dolarprice-news.timer` (20 min) |
 | Base | MariaDB `dolarprice`, credenciales en `/root/.dolarprice-db-credentials` |
 | vhost | `/etc/nginx/sites-available/dolarprice.com` |
 | Despliegue | `/usr/local/bin/dolarprice-deploy`, lo invoca GitHub Actions |
@@ -32,6 +32,21 @@ No lo es, y **no se arregla desactivando la verificación**: el intermedio corre
 Si algún día el BCV arregla su cadena, esto sigue funcionando igual.
 
 **Binance sí es alcanzable desde Contabo**, sin proxy ni nada. Se probó.
+
+**Las noticias salen de la base de verificavenezuela.org, no de una API.** Ese proyecto
+(Laravel + PostgreSQL, `/var/www/verificavenezuela`) no expone endpoint de noticias. Se
+creó el rol `dolarprice_ro` con `SELECT` solo sobre `news`, `media` y `categories`;
+credenciales en `/root/.dolarprice-vv-credentials`. **No hay que desplegar ni modificar
+verificavenezuela para nada de esto.** El riesgo es el acoplamiento al esquema ajeno: si
+cambian esas tablas, `src/sources/noticias.js` deja de leer — pero la pestaña sigue
+mostrando la última copia de `news_cache` y solo queda vieja, no rota. Para diagnosticar:
+`node src/ingest-news.js --dry-run`.
+
+Las portadas son de Spatie MediaLibrary. La ruta útil es
+`/storage/media/{media_id}/conversions/{nombre-sin-extension}-thumb.webp` (13 KB); el
+original del mismo directorio pesa unos 270 KB. Algunas conversiones faltan en disco aunque
+`generated_conversions` diga que existen, por eso la lista tiene respaldo ante `error` de
+la imagen.
 
 **Al cambiar `styles.css` o `app.js` hay que subir el `?v=N`** en tres lugares:
 `public/index.html`, la lista `SHELL` de `public/sw.js` y la constante `VERSION` de ese
