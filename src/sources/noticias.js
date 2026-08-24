@@ -11,6 +11,25 @@ import { config } from '../config.js'
 
 const BASE = 'https://verificavenezuela.org'
 
+// verificavenezuela guarda published_at como "timestamp without time zone" y su
+// Laravel corre en America/Caracas (config/app.php), asi que esos valores estan
+// en hora de Caracas. El servidor, en cambio, esta en Europe/Berlin: si se deja
+// que el driver los interprete como hora local, salen 6 horas corridas.
+// Por eso se pide el valor crudo y se convierte a mano.
+pg.types.setTypeParser(1114, (v) => v)
+
+function caracasAUtc(texto) {
+  if (!texto) return null
+  const [dia, hora] = String(texto).split(' ')
+  const tentativa = new Date(`${dia}T${hora ?? '00:00:00'}Z`)
+  if (Number.isNaN(tentativa.getTime())) return null
+  // Se deduce el desfase real de Caracas para esa fecha en vez de fijar -4, por
+  // si el pais vuelve a moverlo como en 2007 y 2016.
+  const enCaracas = new Date(tentativa.toLocaleString('en-US', { timeZone: 'America/Caracas' }))
+  const enUtc = new Date(tentativa.toLocaleString('en-US', { timeZone: 'UTC' }))
+  return new Date(tentativa.getTime() + (enUtc.getTime() - enCaracas.getTime()))
+}
+
 // Solo se traen las noticias que ya tienen veredicto. Se excluyen
 // 'sin_verificar' y 'sin_pruebas' porque son trabajo a medio terminar: en una
 // app de tasas se leen como un descuido.
@@ -50,7 +69,7 @@ const SQL = `
   ) m ON TRUE
   WHERE n.status NOT IN ('borrador', 'sin_verificar', 'sin_pruebas')
     AND n.published_at IS NOT NULL
-    AND n.published_at <= NOW()
+    AND n.published_at <= (NOW() AT TIME ZONE 'America/Caracas')
   ORDER BY n.published_at DESC
   LIMIT $1
 `
@@ -99,7 +118,7 @@ export async function fetchNoticias(limite = 60) {
       categoria: f.categoria ? limpiar(f.categoria) : null,
       imagen: urlPortada(f),
       url: `${BASE}/noticia/${f.slug}`,
-      publicado: f.published_at,
+      publicado: caracasAUtc(f.published_at),
       destacada: Boolean(f.is_pinned),
     }))
   } finally {
