@@ -40,3 +40,20 @@ CREATE TABLE IF NOT EXISTS `ingest_runs` (
   PRIMARY KEY (`id`),
   KEY `idx_source_ran` (`source`, `ran_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Copia local de las noticias de verificavenezuela.org. Se sincroniza cada 20
+-- minutos; si esa fuente falla, la pestana sigue mostrando esta copia.
+CREATE TABLE IF NOT EXISTS `news_cache` (
+  `id`           BIGINT UNSIGNED NOT NULL,      -- el id original de verificavenezuela
+  `title`        VARCHAR(500) NOT NULL,
+  `excerpt`      VARCHAR(500) NULL,
+  `verdict`      VARCHAR(40)  NULL,             -- verificado, falso, enganoso...
+  `category`     VARCHAR(80)  NULL,
+  `image_url`    VARCHAR(600) NULL,
+  `url`          VARCHAR(700) NOT NULL,
+  `pinned`       TINYINT(1)   NOT NULL DEFAULT 0,
+  `published_at` DATETIME     NULL,
+  `synced_at`    DATETIME     NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_published` (`published_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

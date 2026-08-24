@@ -98,6 +98,34 @@ export default async function apiRoutes(app) {
     return { code, source, dias, puntos: filas.map((f) => ({ fecha: f.dia, valor: num(f.rate) })) }
   })
 
+  app.get('/api/v1/news', async (req, reply) => {
+    // El limite se acota y se interpola porque LIMIT no admite parametro en
+    // sentencias preparadas de MySQL; el valor ya viene forzado a entero.
+    const limite = Math.min(Math.max(Math.trunc(Number(req.query.limit)) || 30, 1), 60)
+    const filas = await query(
+      `SELECT \`id\`,\`title\`,\`excerpt\`,\`verdict\`,\`category\`,\`image_url\`,\`url\`,\`published_at\`,\`synced_at\`
+         FROM \`news_cache\`
+        ORDER BY \`published_at\` DESC
+        LIMIT ${limite}`
+    )
+
+    reply.header('Cache-Control', 'public, max-age=300, s-maxage=600')
+    return {
+      noticias: filas.map((f) => ({
+        id: Number(f.id),
+        titulo: f.title,
+        resumen: f.excerpt,
+        veredicto: f.verdict,
+        categoria: f.category,
+        imagen: f.image_url,
+        url: f.url,
+        publicado: iso(f.published_at),
+      })),
+      sincronizado: iso(filas[0]?.synced_at ?? null),
+      fuente: 'verificavenezuela.org',
+    }
+  })
+
   app.get('/api/v1/health', async (reply) => {
     const [{ n } = { n: 0 }] = await query('SELECT COUNT(*) AS n FROM `rates_current`')
     const fallos = await query(

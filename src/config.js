@@ -35,5 +35,13 @@ export const config = {
     rows: num('BINANCE_ROWS', 20),
     trimPct: num('BINANCE_TRIM_PCT', 10),
   },
+  // PostgreSQL de verificavenezuela.org, solo lectura.
+  vv: {
+    host: process.env.VV_DB_HOST || '127.0.0.1',
+    port: num('VV_DB_PORT', 5432),
+    database: process.env.VV_DB_NAME || 'verifica_venezuela',
+    user: process.env.VV_DB_USER || 'dolarprice_ro',
+    password: process.env.VV_DB_PASS || '',
+  },
   staleAfterSeconds: num('STALE_AFTER_SECONDS', 2700),
 }

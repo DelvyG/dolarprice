@@ -17,7 +17,7 @@
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
-<link rel="stylesheet" href="/styles.css?v=5">
+<link rel="stylesheet" href="/styles.css?v=6">
 <meta property="og:title" content="DolarPrice · Dólar BCV y paralelo">
 <meta property="og:description" content="Precio del dólar BCV y del paralelo Binance P2P en Venezuela.">
 <meta property="og:type" content="website">
@@ -107,6 +107,14 @@
     <p class="note">Publicadas por el Banco Central de Venezuela en su portal de tasas informativas.</p>
   </section>
 
+  <!-- ══ NOTICIAS ══ -->
+  <section class="tabpane" data-pane="noticias" hidden>
+    <h2 class="h2">Noticias</h2>
+    <p class="h2sub" id="news-sub">Verificadas por verificavenezuela.org</p>
+    <div class="news" id="lista-noticias"></div>
+    <p class="note">Las publica y verifica <strong>verificavenezuela.org</strong>. Al tocarlas se abren en ese sitio.</p>
+  </section>
+
   <!-- ══ HISTORIAL ══ -->
   <section class="tabpane" data-pane="historial" hidden>
     <h2 class="h2">Histórico</h2>
@@ -133,6 +141,9 @@
   <button class="tab" data-tab="monedas" role="tab" aria-selected="false">
     <svg viewBox="0 0 24 24" class="i"><circle cx="8" cy="8" r="5"/><path d="M15.5 4.2a5 5 0 0 1 0 15.6"/><path d="M8 5.5v5"/></svg><span>Monedas</span>
   </button>
+  <button class="tab" data-tab="noticias" role="tab" aria-selected="false">
+    <svg viewBox="0 0 24 24" class="i"><path d="M4 4h13a1 1 0 0 1 1 1v14a2 2 0 0 0 2 2H5a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1z"/><path d="M18 8h2a1 1 0 0 1 1 1v10"/><path d="M7 8h7"/><path d="M7 12h7"/><path d="M7 16h4"/></svg><span>Noticias</span>
+  </button>
   <button class="tab" data-tab="historial" role="tab" aria-selected="false">
     <svg viewBox="0 0 24 24" class="i"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg><span>Histórico</span>
   </button>
@@ -156,6 +167,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/app.js?v=4" type="module"></script>
+<script src="/app.js?v=6" type="module"></script>
 </body>
 </html>

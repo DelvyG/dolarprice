@@ -399,12 +399,83 @@ function irA(nombre) {
   $('#scroll').scrollTo?.({ top: 0 })
   scrollTo({ top: 0, behavior: 'smooth' })
   if (nombre === 'historial') cargarHistorial()
+  if (nombre === 'noticias') cargarNoticias()
 }
 
 $$('.tab').forEach((t) => t.addEventListener('click', () => { vibrar(); irA(t.dataset.tab) }))
 
 const tabInicial = new URLSearchParams(location.search).get('tab')
-if (tabInicial && ['inicio', 'monedas', 'historial'].includes(tabInicial)) irA(tabInicial)
+if (tabInicial && ['inicio', 'monedas', 'noticias', 'historial'].includes(tabInicial)) irA(tabInicial)
+
+/* ─── noticias ─── */
+
+// Las publica verificavenezuela.org; aqui solo se listan y se abren alla.
+const VEREDICTOS = {
+  verificado: ['Verificado', 'ok'],
+  falso: ['Falso', 'mal'],
+  enganoso: ['Engañoso', 'ojo'],
+  parcialmente_verdadero: ['Parcialmente cierto', 'ojo'],
+  sin_pruebas: ['Sin pruebas', 'neutro'],
+  sin_verificar: ['Sin verificar', 'neutro'],
+}
+
+let noticiasCargadas = false
+
+const escapar = (s) =>
+  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+function fechaCorta(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const dias = Math.floor((Date.now() - d.getTime()) / 86400000)
+  if (dias <= 0) return 'hoy'
+  if (dias === 1) return 'ayer'
+  if (dias < 7) return `hace ${dias} días`
+  return d.toLocaleDateString('es-VE', { day: 'numeric', month: 'short' })
+}
+
+async function cargarNoticias() {
+  const cont = $('#lista-noticias')
+  if (noticiasCargadas) return
+
+  try {
+    const res = await fetch('/api/v1/news?limit=40')
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    const { noticias, sincronizado } = await res.json()
+
+    if (!noticias.length) {
+      cont.innerHTML = '<p class="note">Todavía no hay noticias sincronizadas.</p>'
+      return
+    }
+
+    cont.innerHTML = noticias
+      .map((n) => {
+        const [etiqueta, tono] = VEREDICTOS[n.veredicto] ?? ['', 'neutro']
+        const portada = n.imagen
+          ? `<img class="new-img" src="${escapar(n.imagen)}" alt="" loading="lazy" decoding="async" width="92" height="92">`
+          : '<div class="new-img vacia">📰</div>'
+        return `
+          <a class="new-item" href="${escapar(n.url)}" target="_blank" rel="noopener noreferrer">
+            ${portada}
+            <div class="new-body">
+              <div class="new-top">
+                ${etiqueta ? `<span class="vd vd-${tono}">${etiqueta}</span>` : ''}
+                ${n.categoria ? `<span class="new-cat">${escapar(n.categoria)}</span>` : ''}
+              </div>
+              <div class="new-titulo">${escapar(n.titulo)}</div>
+              <div class="new-pie">${fechaCorta(n.publicado)}</div>
+            </div>
+          </a>`
+      })
+      .join('')
+
+    $('#news-sub').textContent = `Verificadas por verificavenezuela.org · ${noticias.length} publicadas`
+    noticiasCargadas = true
+    if (sincronizado) console.log('noticias sincronizadas', sincronizado)
+  } catch {
+    cont.innerHTML = '<p class="note">No se pudieron cargar las noticias. Revisa tu conexión e inténtalo de nuevo.</p>'
+  }
+}
 
 /* ─── histórico ─── */
 

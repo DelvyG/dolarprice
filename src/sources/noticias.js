@@ -1,0 +1,103 @@
+import pg from 'pg'
+import { config } from '../config.js'
+
+// Las noticias salen de verificavenezuela.org, que corre en el mismo servidor
+// sobre PostgreSQL. Se leen con un rol que solo tiene SELECT sobre news, media
+// y categories: ese proyecto no se toca ni se despliega para esto.
+//
+// El resultado se copia a la base de DolarPrice (ver ingest-news.js). Si
+// verificavenezuela esta caido o cambia su esquema, la pestana sigue mostrando
+// lo ultimo sincronizado en vez de romperse.
+
+const BASE = 'https://verificavenezuela.org'
+
+// Los veredictos que publica el verificador, con su etiqueta para la interfaz.
+export const VEREDICTOS = {
+  verificado: { texto: 'Verificado', tono: 'ok' },
+  falso: { texto: 'Falso', tono: 'mal' },
+  enganoso: { texto: 'Engañoso', tono: 'ojo' },
+  parcialmente_verdadero: { texto: 'Parcialmente cierto', tono: 'ojo' },
+  sin_pruebas: { texto: 'Sin pruebas', tono: 'neutro' },
+  sin_verificar: { texto: 'Sin verificar', tono: 'neutro' },
+}
+
+const SQL = `
+  SELECT
+    n.id,
+    n.title,
+    n.slug,
+    n.status,
+    n.published_at,
+    n.is_pinned,
+    LEFT(regexp_replace(COALESCE(n.body, ''), '<[^>]*>', ' ', 'g'), 400) AS resumen,
+    c.name  AS categoria,
+    m.id    AS media_id,
+    m.file_name,
+    m.generated_conversions
+  FROM news n
+  LEFT JOIN categories c ON c.id = n.category_id
+  LEFT JOIN LATERAL (
+    SELECT id, file_name, generated_conversions
+      FROM media
+     WHERE model_id = n.id AND model_type LIKE '%News%' AND collection_name = 'cover'
+     ORDER BY id ASC
+     LIMIT 1
+  ) m ON TRUE
+  WHERE n.status <> 'borrador'
+    AND n.published_at IS NOT NULL
+    AND n.published_at <= NOW()
+  ORDER BY n.published_at DESC
+  LIMIT $1
+`
+
+// Spatie MediaLibrary guarda las conversiones junto al original.
+// Se prefiere la miniatura webp (unos 13 KB) sobre el original (unos 270 KB).
+function urlPortada(fila) {
+  if (!fila.media_id || !fila.file_name) return null
+  const base = `${BASE}/storage/media/${fila.media_id}`
+  const sinExt = String(fila.file_name).replace(/\.[^.]+$/, '')
+  const conv = fila.generated_conversions || {}
+  if (conv.thumb) return `${base}/conversions/${sinExt}-thumb.webp`
+  if (conv.medium) return `${base}/conversions/${sinExt}-medium.webp`
+  return `${base}/${fila.file_name}`
+}
+
+const limpiar = (t) => String(t ?? '').replace(/\s+/g, ' ').trim()
+
+function recortar(texto, largo = 155) {
+  const t = limpiar(texto)
+  if (t.length <= largo) return t
+  const corte = t.slice(0, largo)
+  const espacio = corte.lastIndexOf(' ')
+  return (espacio > 60 ? corte.slice(0, espacio) : corte) + '…'
+}
+
+export async function fetchNoticias(limite = 60) {
+  const cliente = new pg.Client({
+    host: config.vv.host,
+    port: config.vv.port,
+    database: config.vv.database,
+    user: config.vv.user,
+    password: config.vv.password,
+    connectionTimeoutMillis: 8000,
+    query_timeout: 15000,
+  })
+
+  await cliente.connect()
+  try {
+    const { rows } = await cliente.query(SQL, [limite])
+    return rows.map((f) => ({
+      id: Number(f.id),
+      titulo: limpiar(f.title),
+      resumen: recortar(f.resumen),
+      veredicto: f.status,
+      categoria: f.categoria ? limpiar(f.categoria) : null,
+      imagen: urlPortada(f),
+      url: `${BASE}/noticia/${f.slug}`,
+      publicado: f.published_at,
+      destacada: Boolean(f.is_pinned),
+    }))
+  } finally {
+    await cliente.end()
+  }
+}
