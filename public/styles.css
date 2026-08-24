@@ -30,6 +30,10 @@
   --ease: cubic-bezier(.32,.72,0,1);
 }
 
+/* En claro los acentos se oscurecen. Los tonos de arriba estan calculados para
+   brillar sobre fondo oscuro; sobre uno claro se pierden: el verde #4ADE80
+   queda en 1,7:1 contra la tarjeta y el amarillo de Binance en 1,9:1, o sea
+   ilegibles. Estos reemplazos rondan 5:1, que ya cumple AA. */
 :root[data-theme="light"] {
   --bg:        #F2F6F3;
   --bg-2:      #FFFFFF;
@@ -40,6 +44,9 @@
   --text:      #0C1D15;
   --muted:     #5C7268;
   --danger:    #DC2626;
+  --brand-2:   #15803D;
+  --teal:      #0F766E;
+  --binance:   #A16207;
 }
 
 @media (prefers-color-scheme: light) {
@@ -53,6 +60,9 @@
     --text:      #0C1D15;
     --muted:     #5C7268;
     --danger:    #DC2626;
+    --brand-2:   #15803D;
+    --teal:      #0F766E;
+    --binance:   #A16207;
   }
 }
 
