@@ -53,11 +53,16 @@ async function main() {
     )
   }
 
-  // Se conservan solo las mas recientes; lo viejo no aporta y engorda la tabla.
-  await query(
-    'DELETE FROM `news_cache` WHERE `id` NOT IN (SELECT `id` FROM (SELECT `id` FROM `news_cache` ORDER BY `published_at` DESC LIMIT ?) x)',
-    [CUANTAS]
-  )
+  // La copia local queda exactamente igual a lo que la fuente acaba de devolver.
+  // Asi, si cambia el filtro de veredictos, lo que deja de calificar desaparece
+  // en la siguiente corrida en vez de quedarse pegado por ser reciente.
+  if (noticias.length) {
+    const ids = noticias.map((n) => n.id)
+    await query(
+      `DELETE FROM \`news_cache\` WHERE \`id\` NOT IN (${ids.map(() => '?').join(',')})`,
+      ids
+    )
+  }
 
   await registrarCorrida('NOTICIAS', true, null, Date.now() - inicio)
   const [{ n } = { n: 0 }] = await query('SELECT COUNT(*) AS n FROM `news_cache`')

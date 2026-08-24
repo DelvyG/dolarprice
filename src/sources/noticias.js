@@ -11,14 +11,19 @@ import { config } from '../config.js'
 
 const BASE = 'https://verificavenezuela.org'
 
-// Los veredictos que publica el verificador, con su etiqueta para la interfaz.
+// Solo se traen las noticias que ya tienen veredicto. Se excluyen
+// 'sin_verificar' y 'sin_pruebas' porque son trabajo a medio terminar: en una
+// app de tasas se leen como un descuido.
+//
+// 'falso' y 'enganoso' SI entran, aunque suene raro: son verificaciones
+// completas, y un desmentido con su etiqueta roja es justamente lo mas util
+// que publica un verificador. Filtrar aqui no afecta a verificavenezuela.org,
+// que sigue publicando todo.
 export const VEREDICTOS = {
   verificado: { texto: 'Verificado', tono: 'ok' },
   falso: { texto: 'Falso', tono: 'mal' },
   enganoso: { texto: 'Engañoso', tono: 'ojo' },
   parcialmente_verdadero: { texto: 'Parcialmente cierto', tono: 'ojo' },
-  sin_pruebas: { texto: 'Sin pruebas', tono: 'neutro' },
-  sin_verificar: { texto: 'Sin verificar', tono: 'neutro' },
 }
 
 const SQL = `
@@ -43,7 +48,7 @@ const SQL = `
      ORDER BY id ASC
      LIMIT 1
   ) m ON TRUE
-  WHERE n.status <> 'borrador'
+  WHERE n.status NOT IN ('borrador', 'sin_verificar', 'sin_pruebas')
     AND n.published_at IS NOT NULL
     AND n.published_at <= NOW()
   ORDER BY n.published_at DESC

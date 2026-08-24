@@ -471,8 +471,6 @@ const VEREDICTOS = {
   falso: ['Falso', 'mal'],
   enganoso: ['Engañoso', 'ojo'],
   parcialmente_verdadero: ['Parcialmente cierto', 'ojo'],
-  sin_pruebas: ['Sin pruebas', 'neutro'],
-  sin_verificar: ['Sin verificar', 'neutro'],
 }
 
 let noticiasCargadas = false
