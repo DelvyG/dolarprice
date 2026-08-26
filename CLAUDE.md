@@ -256,3 +256,28 @@ recuperar.
 cambiarlo **no** obliga a subir el `?v=N` en los tres sitios de siempre. Si en cambio
 se toca `public/app.js` (donde vive el beacon), sí hay que subirlo en `index.html`, en
 la lista `SHELL` de `sw.js` y en la constante `VERSION` de ese mismo archivo.
+
+## Trampas del despliegue (aprendidas el 26/08/2026)
+
+**No lanzar `gh workflow run` después de un `git push`.** El push ya dispara el
+workflow; lanzar además el manual hace correr dos despliegues a la vez sobre el mismo
+checkout y el segundo muere con
+`cannot lock ref 'refs/remotes/origin/main'`. Es inofensivo —falla en el `git fetch`,
+antes de tocar dependencias— pero deja un run en rojo que parece un problema y no lo es.
+
+Ojo: **a veces el push no dispara nada**. Pasó una vez ese mismo día: el commit llegó al
+repo, Actions estaba activo y el workflow en estado `active`, pero no se creó ningún run.
+Ahí sí toca `gh workflow run deploy.yml --ref main`, que el workflow acepta porque tiene
+`workflow_dispatch`. La regla práctica: hacer el push, **mirar si apareció el run**, y
+solo lanzarlo a mano si no apareció.
+
+**`npm ci` borra `node_modules` antes de reinstalar.** Si falla a medias lo deja vacío y
+el servicio sigue vivo *solo* porque Node ya tiene los módulos en memoria: el sitio se cae
+en el siguiente reinicio, horas después y sin relación aparente. Pasó una vez. El script
+de despliegue ya reintenta y **comprueba que los módulos cargan antes de reiniciar**, pero
+si alguna vez se ve `node_modules` vacío con el servicio `active`, eso es una bomba de
+relojería — arreglarlo antes de reiniciar nada:
+
+```bash
+cd /var/www/dolarprice && sudo -u dolarprice npm ci --omit=dev
+```
