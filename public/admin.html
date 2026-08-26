@@ -830,14 +830,29 @@ function taparClaves(form) {
 
 /* ─── llamadas ─── */
 
+// Error propio para la sesión caducada, con una marca en vez de un texto
+// reconocible. Antes se lanzaba new Error('sesion') y se comparaba el mensaje;
+// bastó que un sitio pintara e.message sin filtrar para que al usuario le
+// saliera la palabra "sesion" en rojo bajo el formulario de entrada.
+class SesionCaducada extends Error {
+  constructor() { super('La sesión caducó'); this.caducada = true }
+}
+
 async function api(ruta, opciones = {}) {
+  const { esLogin, ...resto } = opciones
   const res = await fetch(ruta, {
     credentials: 'same-origin',
     cache: 'no-store',
-    ...opciones,
-    headers: { 'Content-Type': 'application/json', ...(opciones.headers || {}) },
+    ...resto,
+    headers: { 'Content-Type': 'application/json', ...(resto.headers || {}) },
   })
-  if (res.status === 401) { mostrarLogin(); throw new Error('sesion') }
+
+  // En el propio login, un 401 NO es una sesión caducada: es que el correo o la
+  // clave están mal, y ese mensaje tiene que llegar tal cual al usuario. Sin
+  // esta salvedad, equivocarse de contraseña mandaba de vuelta a la pantalla de
+  // entrada borrando el correo ya escrito.
+  if (res.status === 401 && !esLogin) { mostrarLogin(); throw new SesionCaducada() }
+
   const datos = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(datos.error || 'Error ' + res.status)
   return datos
@@ -872,6 +887,7 @@ $('#formLogin').addEventListener('submit', async (e) => {
   try {
     const correo = $('#email').value.trim()
     await api('/api/admin/login', {
+      esLogin: true,
       method: 'POST',
       body: JSON.stringify({ email: correo, pass: $('#pass').value }),
     })
@@ -1060,7 +1076,7 @@ async function cargarStats() {
     pintarApp(d)
     redibujar()
   } catch (e) {
-    if (e.message !== 'sesion') toast(e.message)
+    if (!e.caducada) toast(e.message)
   } finally {
     $('main').classList.remove('cargando')
   }
@@ -1193,7 +1209,7 @@ async function cargarVisitas() {
     $$('#tablaIps tr.pulsable').forEach((tr) =>
       tr.addEventListener('click', () => abrirVisitante({ ip: tr.dataset.ip })))
   } catch (e) {
-    if (e.message !== 'sesion') toast(e.message)
+    if (!e.caducada) toast(e.message)
   }
 }
 
@@ -1222,7 +1238,7 @@ async function cargarSalud() {
       { clave: 'Días de detalle que se conservan', visitas: d.retencionDias },
     ], { sinSub: true, valor: (f) => (f.clave.startsWith('Geoloc') ? (f.visitas ? 'OK' : 'FALTA') : num(f.visitas)) })
   } catch (e) {
-    if (e.message !== 'sesion') toast(e.message)
+    if (!e.caducada) toast(e.message)
   }
 }
 
@@ -1246,7 +1262,7 @@ async function cargarPerfil() {
           '<td>' + hora(s.expira) + '</td></tr>').join('') + '</tbody>'
       : vacio('Ninguna sesión abierta')
   } catch (e) {
-    if (e.message !== 'sesion') toast(e.message)
+    if (!e.caducada) toast(e.message)
   }
 }
 
@@ -1278,7 +1294,7 @@ $('#formClave').addEventListener('submit', async (e) => {
     toast('Contraseña cambiada')
     cargarPerfil()
   } catch (e2) {
-    if (e2.message === 'sesion') return
+    if (e2.caducada) return
     av.classList.add('mal')
     // Si falla la contraseña actual, casi siempre es que el navegador rellenó
     // el campo solo con otra clave guardada. Se dice, en vez de dejar al
@@ -1312,7 +1328,7 @@ $('#formCorreo').addEventListener('submit', async (e) => {
     try { localStorage.setItem(CLAVE_CORREO, r.correo) } catch {}
     toast('Correo actualizado')
   } catch (e2) {
-    if (e2.message === 'sesion') return
+    if (e2.caducada) return
     av.classList.add('mal')
     av.textContent = e2.message
     vibrar(40)
@@ -1328,7 +1344,7 @@ $('#btnCerrarTodas').addEventListener('click', async () => {
     toast('Sesiones cerradas. Hay que entrar de nuevo.')
     setTimeout(mostrarLogin, 1200)
   } catch (e) {
-    if (e.message !== 'sesion') toast(e.message)
+    if (!e.caducada) toast(e.message)
   }
 })
 
@@ -1370,7 +1386,7 @@ async function abrirVisitante(clave) {
         : '<tbody><tr><td>' + vacio('Sin historial') + '</td></tr></tbody>') +
       '</table></div></div>'
   } catch (e) {
-    if (e.message !== 'sesion') $('#hojaCuerpo').innerHTML = vacio('No se pudo cargar', e.message)
+    if (!e.caducada) $('#hojaCuerpo').innerHTML = vacio('No se pudo cargar', e.message)
   }
 }
 
