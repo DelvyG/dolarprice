@@ -14,7 +14,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT, config } from '../config.js'
 import { query } from '../db.js'
-import { entrar, cerrarSesion, cerrarTodas, haySesion, exigirSesion, sesionesAbiertas } from '../admin/auth.js'
+import { entrar, cerrarSesion, cerrarTodas, haySesion, exigirSesion, sesionesAbiertas, cambiarClave, cambiarCorreo } from '../admin/auth.js'
+import { correoAdmin, origenHash, hashAdmin } from '../admin/ajustes.js'
 import { ipDe, purgar } from '../analytics/track.js'
 import { estadisticas, ultimasVisitas, detalleVisitante, topIps, RANGOS } from '../analytics/queries.js'
 import { hayBaseGeo } from '../analytics/geo.js'
@@ -51,6 +52,7 @@ export default async function adminRoutes(app) {
   app.post('/api/admin/login', async (req, reply) => {
     cabeceras(reply)
     const r = await entrar(reply, {
+      email: req.body?.email,
       pass: req.body?.pass,
       ip: ipDe(req),
       ua: req.headers['user-agent'],
@@ -68,7 +70,9 @@ export default async function adminRoutes(app) {
         error: `Demasiados intentos. Vuelve a probar en ${r.minutos} minuto${r.minutos === 1 ? '' : 's'}.`,
       })
     }
-    return reply.code(401).send({ error: 'Contrasena incorrecta' })
+    // Mismo mensaje se equivoque en el correo o en la clave: decir cual de los
+    // dos fallo le regala al atacante la mitad del trabajo.
+    return reply.code(401).send({ error: 'Correo o contrasena incorrectos' })
   })
 
   app.post('/api/admin/logout', async (req, reply) => {
@@ -77,9 +81,11 @@ export default async function adminRoutes(app) {
     return { ok: true }
   })
 
+  // Sin sesion. Devuelve lo justo para que el panel sepa si pintar el login o
+  // el contenido: nada de correo ni de nada que identifique a nadie.
   app.get('/api/admin/sesion', async (req, reply) => {
     cabeceras(reply)
-    return { dentro: await haySesion(req), configurado: Boolean(config.admin.hash) }
+    return { dentro: await haySesion(req), configurado: Boolean(await hashAdmin()) }
   })
 
   /* ─── datos ─── */
@@ -133,6 +139,32 @@ export default async function adminRoutes(app) {
         geoip: hayBaseGeo(),
         retencionDias: config.analytics.retencionDias,
       }
+    })
+
+    /* ─── cuenta ─── */
+
+    privado.get('/api/admin/perfil', async () => ({
+      correo: await correoAdmin(),
+      // De donde sale la clave: 'env' significa que sigue siendo la que se puso
+      // a mano en el servidor, 'panel' que ya se cambio desde aqui.
+      origenClave: await origenHash(),
+      sesiones: await sesionesAbiertas(),
+    }))
+
+    privado.post('/api/admin/perfil/clave', async (req, reply) => {
+      const r = await cambiarClave(req, {
+        actual: req.body?.actual,
+        nueva: req.body?.nueva,
+        confirmar: req.body?.confirmar,
+      })
+      if (!r.ok) return reply.code(400).send({ error: r.error })
+      return { ok: true, aviso: 'Contrasena cambiada. Las demas sesiones se cerraron.' }
+    })
+
+    privado.post('/api/admin/perfil/correo', async (req, reply) => {
+      const r = await cambiarCorreo({ correo: req.body?.correo, pass: req.body?.pass })
+      if (!r.ok) return reply.code(400).send({ error: r.error })
+      return { ok: true, correo: await correoAdmin() }
     })
 
     privado.post('/api/admin/sesiones/cerrar-todas', async (req, reply) => {

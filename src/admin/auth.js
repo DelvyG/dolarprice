@@ -20,6 +20,7 @@ import { createHmac, randomBytes, scrypt as scryptCb, createHash, timingSafeEqua
 import { promisify } from 'node:util'
 import { query, ahora } from '../db.js'
 import { config } from '../config.js'
+import { correoAdmin, hashAdmin, guardarHash, guardarCorreo, correoValido, revisarClave } from './ajustes.js'
 
 const scrypt = promisify(scryptCb)
 
@@ -183,8 +184,9 @@ export async function haySesion(req) {
 /**
  * @returns {{ok: true} | {ok: false, motivo: string, minutos?: number}}
  */
-export async function entrar(reply, { pass, ip, ua }) {
-  if (!config.admin.hash) {
+export async function entrar(reply, { email, pass, ip, ua }) {
+  const guardado = await hashAdmin()
+  if (!guardado) {
     await verificarPass(String(pass || ''), null)   // gasta el mismo tiempo igual
     return { ok: false, motivo: 'sin-configurar' }
   }
@@ -192,11 +194,61 @@ export async function entrar(reply, { pass, ip, ua }) {
   const minutos = await bloqueado(ip)
   if (minutos) return { ok: false, motivo: 'bloqueado', minutos }
 
-  const bien = await verificarPass(String(pass || ''), config.admin.hash)
+  // El correo se comprueba igual que la contrasena y se responde lo mismo en
+  // los dos casos: decir "ese correo no existe" le regalaria al atacante la
+  // mitad del trabajo. Y se verifica la clave aunque el correo ya haya fallado,
+  // para que el tiempo de respuesta no delate cual de las dos estaba mal.
+  const correoOk = igual(String(email || '').trim().toLowerCase(), await correoAdmin())
+  const claveOk = await verificarPass(String(pass || ''), guardado)
+  const bien = correoOk && claveOk
+
   await anotarIntento(ip, bien)
   if (!bien) return { ok: false, motivo: 'credenciales' }
 
   await abrirSesion(reply, ip, ua)
+  return { ok: true }
+}
+
+/**
+ * Cambia la contrasena. Exige la actual: sin eso, a quien te dejara la sesion
+ * abierta un momento le bastaria con cambiarla para quedarse con el panel.
+ *
+ * @returns {{ok: true} | {ok: false, error: string}}
+ */
+export async function cambiarClave(req, { actual, nueva, confirmar }) {
+  const guardado = await hashAdmin()
+  if (!(await verificarPass(String(actual || ''), guardado))) {
+    return { ok: false, error: 'La contrasena actual no es correcta' }
+  }
+
+  const problema = revisarClave(nueva, confirmar)
+  if (problema) return { ok: false, error: problema }
+  if (await verificarPass(nueva, guardado)) {
+    return { ok: false, error: 'La contrasena nueva es igual a la de ahora' }
+  }
+
+  await guardarHash(await hashear(nueva))
+
+  // Se cierran las demas sesiones, no la de quien esta cambiando la clave: si
+  // alguien mas la tenia abierta, el cambio no sirve de nada mientras siga
+  // dentro. Es justo el caso en el que se cambia una contrasena.
+  const mia = tokenValido(leerCookie(req))
+  if (mia) {
+    await query('DELETE FROM `admin_sessions` WHERE `token_hash` <> ?', [sha256(mia)])
+  } else {
+    await query('DELETE FROM `admin_sessions`')
+  }
+
+  return { ok: true }
+}
+
+/** Cambiar el correo tambien pide la contrasena: es una credencial de entrada. */
+export async function cambiarCorreo({ correo, pass }) {
+  if (!(await verificarPass(String(pass || ''), await hashAdmin()))) {
+    return { ok: false, error: 'La contrasena no es correcta' }
+  }
+  if (!correoValido(correo)) return { ok: false, error: 'Ese correo no tiene buena pinta' }
+  await guardarCorreo(correo)
   return { ok: true }
 }
 

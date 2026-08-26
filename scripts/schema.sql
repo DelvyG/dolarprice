@@ -177,3 +177,16 @@ CREATE TABLE IF NOT EXISTS `apk_downloads` (
   KEY `idx_created` (`created_at`),
   KEY `idx_ip` (`ip`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Ajustes del panel: correo de entrada y hash de la contrasena.
+--
+-- Viven en la base y no en el .env para que se puedan cambiar desde el propio
+-- panel sin entrar por SSH ni reiniciar el servicio. El .env sigue valiendo
+-- como arranque: si esta tabla esta vacia se usa lo que haya alli, y en cuanto
+-- se cambia la clave desde el panel manda esta tabla.
+CREATE TABLE IF NOT EXISTS `admin_config` (
+  `clave`       VARCHAR(40)  NOT NULL,          -- email | pass_hash
+  `valor`       TEXT         NOT NULL,
+  `actualizado` DATETIME     NOT NULL,
+  PRIMARY KEY (`clave`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
