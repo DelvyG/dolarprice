@@ -173,7 +173,10 @@ const porHora = (l) => query(
 /* ─── el APK ─── */
 
 async function apk(l) {
-  const [[desc], [usuarios], [instalPwa], [relacionada], serie] = await Promise.all([
+  // Ojo con la desestructuracion: `usuarios` y `serie` NO llevan corchetes.
+  // Las demas son consultas que devuelven una sola fila y se saca con [x]; esas
+  // dos ya vienen transformadas -- un objeto la primera, una lista la segunda.
+  const [[desc], usuarios, [instalPwa], [relacionada], serie] = await Promise.all([
     query(
       'SELECT COUNT(*) AS total, COUNT(DISTINCT `ip`) AS unicas FROM `apk_downloads` WHERE `created_at` >= ?',
       [l.desde]
