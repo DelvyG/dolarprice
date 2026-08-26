@@ -13,8 +13,44 @@ cd "$RUTA"
 sudo -u dolarprice git fetch --prune origin "$RAMA"
 sudo -u dolarprice git reset --hard "origin/$RAMA"
 
+# ── Dependencias ─────────────────────────────────────────────────────────────
+# `npm ci` BORRA node_modules antes de reinstalar. Si falla a medias, el
+# directorio queda vacio y el servicio sigue vivo unicamente porque Node ya
+# tiene los modulos cargados en memoria: el sitio se cae en el siguiente
+# reinicio, que puede ser horas despues y sin relacion aparente con esto.
+# Paso de verdad el 26/08/2026 -- npm ci revento con un ENOENT y dejo
+# node_modules en cero; a la segunda corrida entro sin tocar nada.
+#
+# Contabo es una maquina compartida con otros proyectos corriendo npm a la vez,
+# asi que un tropiezo puntual es esperable. De ahi los reintentos y, sobre todo,
+# la comprobacion de que los modulos CARGAN antes de reiniciar nada.
 echo "==> Dependencias"
-sudo -u dolarprice npm ci --omit=dev
+instalado=0
+for intento in 1 2 3; do
+  if sudo -u dolarprice npm ci --omit=dev; then instalado=1; break; fi
+  echo "    npm ci fallo (intento $intento de 3), reintentando..." >&2
+  sleep 3
+done
+
+if [ "$instalado" != "1" ]; then
+  echo "    ultimo recurso: npm install --omit=dev" >&2
+  sudo -u dolarprice npm install --omit=dev --no-audit --no-fund || true
+fi
+
+# Que los ficheros existan no basta: tienen que poder cargarse. Esta es la
+# comprobacion que de verdad impide reiniciar sobre un node_modules roto.
+echo "==> Comprobando que las dependencias cargan"
+if ! sudo -u dolarprice node -e "
+  Promise.all(['fastify','@fastify/static','mysql2/promise','pg','maxmind'].map((m) => import(m)))
+    .then(() => console.log('    ok, los modulos cargan'))
+    .catch((e) => { console.error('    NO CARGAN: ' + e.message); process.exit(1) })
+"; then
+  echo "FALLO: node_modules quedo inservible. NO se reinicia el servicio." >&2
+  echo "       El sitio sigue corriendo con lo que Node tiene en memoria, pero" >&2
+  echo "       esta a un reinicio de caerse. Arreglar cuanto antes:" >&2
+  echo "         cd $RUTA && sudo -u dolarprice npm ci --omit=dev" >&2
+  exit 1
+fi
 
 echo "==> Esquema de base de datos"
 sudo -u dolarprice node scripts/migrate.js
