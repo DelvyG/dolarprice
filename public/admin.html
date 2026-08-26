@@ -136,6 +136,20 @@ input::placeholder { color: color-mix(in srgb, var(--muted) 70%, transparent); }
 .btn.sec { background: var(--surface-2); color: var(--text); border: 1px solid var(--line-2); }
 .btn.peligro { background: transparent; color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
 
+/* Campo de contraseña con el botón de ver. El envoltorio y el botón los pone
+   el JS sobre cada input[type=password], para no repetirlos en el HTML. */
+.con-ojo { position: relative; }
+.con-ojo input { padding-right: 44px; }
+.ojo {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: 8px; color: var(--muted);
+  transition: color .16s, background .16s;
+}
+.ojo:hover { color: var(--text); background: var(--line); }
+.ojo .ic { width: 18px; height: 18px; }
+
 .aviso { margin-top: 14px; font-size: .81rem; min-height: 1.15em; line-height: 1.4; }
 .aviso.mal { color: var(--danger); }
 .aviso.bien { color: var(--brand-2); }
@@ -479,6 +493,8 @@ footer a { color: var(--muted); }
   <symbol id="i-recargar" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 3.5V9H15"/></symbol>
   <symbol id="i-salir" viewBox="0 0 24 24"><path d="M9.5 20.5H5.5a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2h4"/><path d="M16 16.5l4.5-4.5L16 7.5"/><path d="M20.5 12H9.5"/></symbol>
   <symbol id="i-nada" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12h7"/></symbol>
+  <symbol id="i-ojo" viewBox="0 0 24 24"><path d="M2 12s3.8-6.4 10-6.4S22 12 22 12s-3.8 6.4-10 6.4S2 12 2 12z"/><circle cx="12" cy="12" r="2.7"/></symbol>
+  <symbol id="i-ojo-no" viewBox="0 0 24 24"><path d="M10.7 6.1A10 10 0 0 1 12 6c6.2 0 10 6 10 6a18.4 18.4 0 0 1-3.1 3.7"/><path d="M6.2 7.7A17.7 17.7 0 0 0 2 12s3.8 6 10 6a9.8 9.8 0 0 0 4-.8"/><path d="M3.5 3.5l17 17"/></symbol>
 </defs></svg>
 
 <!-- ═══ entrada ═══ -->
@@ -640,9 +656,15 @@ footer a { color: var(--muted); }
                 <label for="nuevoCorreo">Correo</label>
                 <input type="email" id="nuevoCorreo" autocomplete="off" required>
               </div>
+              <!-- autocomplete="new-password" en un campo que pide la contraseña
+                   ACTUAL parece un error, pero es a propósito: es la única forma
+                   de que Chrome no rellene el campo solo. Con "current-password"
+                   mete la clave que tenga guardada, deja el campo pintado de
+                   amarillo, y el usuario le da a enviar sin darse cuenta de que
+                   ahí hay algo que él no escribió. Pasó de verdad. -->
               <div class="campo">
                 <label for="passCorreo">Tu contraseña actual</label>
-                <input type="password" id="passCorreo" autocomplete="current-password" placeholder="para confirmar el cambio" required>
+                <input type="password" id="passCorreo" autocomplete="new-password" placeholder="para confirmar el cambio" required>
               </div>
               <button class="btn sec" type="submit">Cambiar correo</button>
               <div class="aviso" id="avisoCorreo"></div>
@@ -652,9 +674,11 @@ footer a { color: var(--muted); }
           <div class="caja">
             <h2>Cambiar contraseña</h2>
             <form class="formulario" id="formClave" autocomplete="off">
+              <!-- Los tres van con new-password para que Chrome no rellene
+                   ninguno solo. Ver la nota del formulario del correo. -->
               <div class="campo">
                 <label for="claveActual">Contraseña actual</label>
-                <input type="password" id="claveActual" autocomplete="current-password" required>
+                <input type="password" id="claveActual" autocomplete="new-password" required>
               </div>
               <div class="campo">
                 <label for="claveNueva">Contraseña nueva</label>
@@ -753,6 +777,56 @@ function duracion(seg) {
 const vacio = (titulo, texto) =>
   '<div class="vacio"><svg class="ic"><use href="#i-nada"/></svg><b>' + esc(titulo) + '</b>' +
   (texto ? '<p>' + esc(texto) + '</p>' : '') + '</div>'
+
+/* ─── botón de ver la contraseña ──────────────────────────────────────────────
+   Se aplica a todos los input[type=password] de golpe, así no hay que repetir
+   el botón en cada formulario ni acordarse de ponerlo en el siguiente.
+
+   No es solo comodidad: sin poder ver lo que hay en el campo, un valor que
+   metió el navegador solo es indistinguible de uno tecleado, y el usuario
+   acaba peleándose con un "contraseña incorrecta" que no entiende. */
+function ponerOjos() {
+  $$('input[type="password"]').forEach((inp) => {
+    if (inp.parentElement?.classList.contains('con-ojo')) return   // ya lo tiene
+
+    const envoltorio = document.createElement('div')
+    envoltorio.className = 'con-ojo'
+    inp.parentNode.insertBefore(envoltorio, inp)
+    envoltorio.appendChild(inp)
+
+    const b = document.createElement('button')
+    b.type = 'button'          // sin esto, dentro de un form haría submit
+    b.className = 'ojo'
+    b.setAttribute('aria-label', 'Mostrar la contraseña')
+    b.innerHTML = '<svg class="ic"><use href="#i-ojo"/></svg>'
+
+    b.addEventListener('click', () => {
+      const mostrar = inp.type === 'password'
+      inp.type = mostrar ? 'text' : 'password'
+      b.querySelector('use').setAttribute('href', mostrar ? '#i-ojo-no' : '#i-ojo')
+      b.setAttribute('aria-label', mostrar ? 'Ocultar la contraseña' : 'Mostrar la contraseña')
+      // Devolver el foco al final del texto: si no, el cursor salta al inicio.
+      inp.focus()
+      const n = inp.value.length
+      try { inp.setSelectionRange(n, n) } catch {}
+    })
+
+    envoltorio.appendChild(b)
+  })
+}
+ponerOjos()
+
+// Al enviar un formulario, los campos vuelven a ocultarse: dejar una contraseña
+// a la vista en pantalla después de guardar no tiene sentido.
+function taparClaves(form) {
+  form.querySelectorAll('.con-ojo input').forEach((inp) => {
+    if (inp.type === 'text') {
+      inp.type = 'password'
+      const b = inp.parentElement.querySelector('.ojo use')
+      if (b) b.setAttribute('href', '#i-ojo')
+    }
+  })
+}
 
 /* ─── llamadas ─── */
 
@@ -1200,12 +1274,18 @@ $('#formClave').addEventListener('submit', async (e) => {
     av.classList.add('bien')
     av.textContent = r.aviso
     e.target.reset()
+    taparClaves(e.target)
     toast('Contraseña cambiada')
     cargarPerfil()
   } catch (e2) {
     if (e2.message === 'sesion') return
     av.classList.add('mal')
-    av.textContent = e2.message
+    // Si falla la contraseña actual, casi siempre es que el navegador rellenó
+    // el campo solo con otra clave guardada. Se dice, en vez de dejar al
+    // usuario peleándose con un mensaje que no explica nada.
+    av.textContent = /actual/i.test(e2.message)
+      ? e2.message + '. Si el campo se rellenó solo, bórralo y escríbela — toca el ojo para verla.'
+      : e2.message
     vibrar(40)
   } finally {
     btn.disabled = false
@@ -1227,6 +1307,7 @@ $('#formCorreo').addEventListener('submit', async (e) => {
     av.classList.add('bien')
     av.textContent = 'Correo actualizado. Con este entras a partir de ahora.'
     $('#passCorreo').value = ''
+    taparClaves(e.target)
     $('#correoLado').textContent = r.correo
     try { localStorage.setItem(CLAVE_CORREO, r.correo) } catch {}
     toast('Correo actualizado')
