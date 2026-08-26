@@ -10,11 +10,14 @@
     "start": "node src/server.js",
     "ingest": "node src/ingest.js",
     "ingest:dry": "node src/ingest.js --dry-run",
-    "migrate": "node scripts/migrate.js"
+    "migrate": "node scripts/migrate.js",
+    "geoip": "node scripts/update-geoip.js",
+    "admin:pass": "node scripts/admin-pass.js"
   },
   "dependencies": {
     "@fastify/static": "^10.1.3",
     "fastify": "^5.2.1",
+    "maxmind": "^5.0.7",
     "mysql2": "^3.12.0",
     "pg": "^8.23.0"
   }

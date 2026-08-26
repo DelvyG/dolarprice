@@ -400,6 +400,9 @@ function irA(nombre) {
   scrollTo({ top: 0, behavior: 'smooth' })
   if (nombre === 'historial') cargarHistorial()
   if (nombre === 'noticias') cargarNoticias()
+  // Definida más abajo, en el apartado de medición: es una declaración de
+  // función, así que ya existe aunque se lea después en el archivo.
+  marcar('tab', { t: nombre })
 }
 
 $$('.tab').forEach((t) => t.addEventListener('click', () => { vibrar(); irA(t.dataset.tab) }))
@@ -685,6 +688,157 @@ document.addEventListener('visibilitychange', () => {
     if (edad > 120000) cargar()
   }
 })
+
+/* ═══ medición ═══════════════════════════════════════════════════════════════
+   Alimenta el panel de /admin. Los datos no salen del servidor de DolarPrice:
+   no hay Google Analytics ni ningún tercero, y por eso tampoco hay banner de
+   cookies que pedir — esto no usa cookies, solo un identificador anónimo en el
+   almacenamiento del propio navegador.
+
+   Se mide desde aquí y no desde el servidor porque el service worker sirve la
+   cáscara desde la caché: una visita repetida no llega a tocar el servidor, y
+   contar allá perdería justo a los usuarios de la PWA y del APK.            */
+
+const CLAVE_VISITANTE = 'dolarprice.vid'
+const CLAVE_SESION = 'dolarprice.sid'
+const CLAVE_MODO = 'dolarprice.modo'
+const SESION_MS = 1800000     // media hora de inactividad y empieza otra sesión
+
+const idNuevo = () => {
+  // crypto.randomUUID no está en Safari viejo ni en WebView antiguos.
+  try {
+    return [...crypto.getRandomValues(new Uint8Array(16))]
+      .map((b) => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    return (Date.now().toString(16) + Math.random().toString(16).slice(2)).padEnd(32, '0').slice(0, 32)
+  }
+}
+
+// Todo lo que toca el almacenamiento va envuelto: en modo incógnito de algunos
+// navegadores localStorage existe pero lanza al escribir.
+const guardar = (k, v) => { try { localStorage.setItem(k, v) } catch {} }
+const leer = (k) => { try { return localStorage.getItem(k) } catch { return null } }
+
+function identidad() {
+  let vid = leer(CLAVE_VISITANTE)
+  if (!/^[a-f0-9]{32}$/.test(vid || '')) { vid = idNuevo(); guardar(CLAVE_VISITANTE, vid) }
+
+  let sid = null
+  try {
+    const crudo = JSON.parse(sessionStorage.getItem(CLAVE_SESION) || 'null')
+    if (crudo && Date.now() - crudo.visto < SESION_MS) sid = crudo.id
+  } catch {}
+  if (!/^[a-f0-9]{32}$/.test(sid || '')) sid = idNuevo()
+  try { sessionStorage.setItem(CLAVE_SESION, JSON.stringify({ id: sid, visto: Date.now() })) } catch {}
+
+  return { vid, sid }
+}
+
+/* ─── de dónde se está abriendo la app ───────────────────────────────────────
+   El APK es una TWA, o sea Chrome de verdad corriendo a pantalla completa. Lo
+   que lo delata es el referente: al lanzarla, Android pone document.referrer en
+   android-app://com.dolarprice.twa. Solo aparece en la primera navegación de la
+   sesión, así que en cuanto se ve una vez se guarda y ya no se pierde.
+
+   Sin ese sello, si la app corre en modo standalone es la PWA instalada; si no,
+   es el navegador normal. Los tres casos se distinguen sin ambigüedad. */
+function detectarModo() {
+  const guardado = leer(CLAVE_MODO)
+  if (guardado === 'apk') return 'apk'     // el sello del APK no caduca
+
+  if (document.referrer.startsWith('android-app://com.dolarprice.twa')) {
+    guardar(CLAVE_MODO, 'apk')
+    return 'apk'
+  }
+
+  const standalone =
+    matchMedia('(display-mode: standalone)').matches ||
+    matchMedia('(display-mode: fullscreen)').matches ||
+    navigator.standalone === true          // así lo dice Safari en iOS
+
+  const modo = standalone ? 'pwa' : 'navegador'
+  guardar(CLAVE_MODO, modo)
+  return modo
+}
+
+const MODO = detectarModo()
+
+/* ─── ¿ya tiene el APK instalado? ────────────────────────────────────────────
+   getInstalledRelatedApps solo responde en Chrome sobre Android y únicamente si
+   Digital Asset Links valida — que es justo lo que arregló assetlinks.json. En
+   todo lo demás queda en null, que significa "no se sabe", no "no lo tiene". */
+let apkInstalado = null
+try {
+  navigator.getInstalledRelatedApps?.().then((apps) => {
+    apkInstalado = apps.some((a) => a.id === 'com.dolarprice.twa')
+  }).catch(() => {})
+} catch {}
+
+/* ─── envío ─── */
+
+const YO = identidad()
+const ARRANQUE = Date.now()
+
+// Ruta corta a propósito: los bloqueadores de anuncios cazan por nombre y
+// "analytics", "track" y "collect" están en todas las listas. No es por
+// esconderse — los datos no salen de nuestro servidor — sino porque si no, la
+// mitad del tráfico no se contaría.
+const RUTA_MEDICION = '/api/v1/e'
+
+function marcar(event, extra = {}) {
+  const cuerpo = JSON.stringify({
+    v: YO.vid,
+    s: YO.sid,
+    event,
+    p: location.pathname,
+    r: document.referrer || null,
+    m: MODO,
+    k: apkInstalado,
+    w: screen.width,
+    h: screen.height,
+    l: navigator.language,
+    ...extra,
+  })
+
+  try {
+    // sendBeacon es lo único que sigue saliendo cuando la pestaña se está
+    // cerrando; fetch se cancela a medio camino. Manda text/plain, que es lo
+    // que el servidor espera en esta ruta.
+    if (navigator.sendBeacon?.(RUTA_MEDICION, new Blob([cuerpo], { type: 'text/plain' }))) return
+  } catch {}
+
+  // keepalive hace lo mismo que sendBeacon donde este no exista.
+  fetch(RUTA_MEDICION, {
+    method: 'POST',
+    body: cuerpo,
+    headers: { 'Content-Type': 'text/plain' },
+    keepalive: true,
+  }).catch(() => {})
+}
+
+// La primera marca espera un momento: así getInstalledRelatedApps ya respondió
+// y la visita entra con ese dato en vez de con un null.
+setTimeout(() => marcar('view', { t: pestanaActual() }), 900)
+
+function pestanaActual() {
+  const activa = document.querySelector('.tab.active')
+  return activa?.dataset.tab || 'inicio'
+}
+
+// Cuánto tiempo estuvo. pagehide y no unload: en iOS unload no llega nunca, y
+// en Android tampoco es fiable con la app en segundo plano.
+let despedido = false
+addEventListener('pagehide', () => {
+  if (despedido) return
+  despedido = true
+  marcar('fin', { d: Date.now() - ARRANQUE })
+})
+
+// Si el usuario vuelve, la visita sigue viva y habrá otra despedida.
+addEventListener('pageshow', () => { despedido = false })
+
+// Instalación de la PWA. El APK no dispara esto: se instala desde el sistema.
+addEventListener('appinstalled', () => marcar('instalar'))
 
 /* ─── arranque ─── */
 

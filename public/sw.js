@@ -5,7 +5,7 @@
    hay senal, de modo que siempre se ve algo -- aunque sea viejo, y la interfaz
    avisa cuando lo es. */
 
-const VERSION = 'v2.3.2'
+const VERSION = 'v2.4.0'
 const CACHE_SHELL = `dp-shell-${VERSION}`
 const CACHE_DATOS = `dp-datos-${VERSION}`
 
@@ -13,7 +13,7 @@ const SHELL = [
   '/',
   '/index.html',
   '/styles.css?v=9',
-  '/app.js?v=11',
+  '/app.js?v=12',
   '/manifest.webmanifest',
   '/icons/icon-96.png',
   '/icons/icon-192.png',
@@ -73,6 +73,15 @@ self.addEventListener('fetch', (e) => {
 
   const url = new URL(req.url)
   if (url.origin !== self.location.origin) return
+
+  // El panel de estadisticas no pasa por aqui: ni la pagina ni sus datos.
+  // Guardarlos dejaria las cifras del sitio en el disco de cualquiera que abra
+  // /admin, y ademas el panel serviria numeros viejos sin avisar. Que vaya
+  // siempre a la red -- si no hay senal, que falle y se vea.
+  if (url.pathname === '/admin' || url.pathname.startsWith('/admin/') ||
+      url.pathname.startsWith('/api/admin/')) {
+    return
+  }
 
   // La API: siempre intenta datos frescos, pero nunca deja la pantalla vacia.
   if (url.pathname.startsWith('/api/')) {

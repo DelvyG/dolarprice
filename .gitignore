@@ -2,3 +2,6 @@ node_modules/
 .env
 *.log
 public/descargas/
+
+# Base de geolocalizacion: 124 MB, se descarga con: npm run geoip
+data/

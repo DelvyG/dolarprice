@@ -108,11 +108,12 @@ hay que correr si se sospecha que el BCV cambió su HTML.
 
 ## Cosas que quedaron fuera a propósito
 
-- **No hay panel de administración.** El de la versión anterior sembraba el usuario
+- **No hay panel de *ajustes*.** El de la versión anterior sembraba el usuario
   `admin@dolarprice.com` con la contraseña `password`, tenía el correo quemado en el
   código y no tenía CSRF ni límite de intentos. Los ajustes que ofrecía (horas de
-  captura, cantidad de anuncios) hoy son variables del `.env`. Si se vuelve a querer un
-  panel, hay que hacerlo de cero.
+  captura, cantidad de anuncios) hoy son variables del `.env` y ahí se quedan.
+  Lo que sí existe, desde el 26/08/2026, es un panel de **estadísticas** hecho de
+  cero y de solo lectura. Ver el apartado siguiente.
 - **No se migró el histórico viejo.** Eran tasas de hace meses y además equivocadas.
 - **No se tocó el paquete de Android.** Es una **TWA** hecha con PWABuilder (contiene
   `TrustedWebActivity` y `androidbrowserhelper`, apunta a `https://dolarprice.com`), no un
@@ -122,3 +123,106 @@ hay que correr si se sospecha que el BCV cambió su HTML.
   distribuye descargando el APK desde el propio sitio. Al arreglar `assetlinks.json` la
   TWA valida Digital Asset Links y abre a pantalla completa, sin la barra del navegador,
   también instalada a mano.
+
+## Panel de estadísticas (`/admin`)
+
+Analítica propia, sin Google Analytics ni ningún tercero: los datos no salen del
+servidor. Se descartaron Umami (no muestra IPs ni visitantes individuales, y era otro
+servicio más en un VPS con 11 sitios) y Matomo (PHP pesado, otro vhost, otra base que
+mantener parcheada).
+
+**No hace falta tocar nginx para nada de esto.** `/admin` cae en `location /` →
+`try_files` → `@app` y `/api/admin/` cae en `location /api/`. Los dos llegan a Node
+tal cual. Es la razón principal por la que se hizo así.
+
+### Lo que de verdad hay que saber
+
+**Las visitas se cuentan desde el cliente, no desde el servidor.** Con el service
+worker instalado, una visita repetida se sirve desde la caché y **no llega a tocar el
+servidor**: contar en un hook de Fastify o leyendo el log de nginx perdería justo a
+los usuarios de la PWA y del APK, que son los más fieles. Por eso hay un beacon en
+`public/app.js` que golpea `POST /api/v1/e`. La ruta es corta a propósito: los
+bloqueadores de anuncios cazan por nombre y `analytics`, `track` y `collect` están en
+todas las listas.
+
+**El service worker deja pasar `/admin` y `/api/admin/` sin tocarlos.** Si no, las
+cifras del sitio quedarían guardadas en el disco de cualquiera que abra el panel, y
+además mostraría números viejos sin avisar. Está al principio del handler de `fetch`
+en `sw.js` — no quitarlo.
+
+**Distinguir APK / PWA / navegador sale del referente.** Al lanzar la TWA, Android
+pone `document.referrer` en `android-app://com.dolarprice.twa`. Eso no lo puede fingir
+un navegador y es lo único fiable: el User-Agent de la TWA es idéntico al de Chrome
+normal, porque *es* Chrome. Solo aparece en la primera navegación de la sesión, así
+que en cuanto se ve una vez se guarda en `localStorage` y ya no se pierde.
+`getInstalledRelatedApps()` responde además si quien entra por navegador ya tiene el
+APK instalado — pero **solo en Chrome sobre Android**; en el resto llega `null`, que
+significa "no se sabe", no "no lo tiene". Por eso el panel muestra el denominador.
+
+**Las descargas del APK sí se cuentan del lado del servidor**, en el hook `onResponse`
+de `server.js`: bajarse un fichero no ejecuta JavaScript y no hay beacon que valga.
+Chrome en Android pide el fichero por trozos y responde **206**, no 200 — de ahí que se
+acepten los dos códigos. Una misma descarga puede generar varias filas, por eso el
+panel enseña IPs distintas y no filas.
+
+**Zona horaria.** En la base todo se guarda en UTC. El panel agrupa por día y por hora
+en hora de Venezuela (UTC−4, sin horario de verano) pasando cada columna por `local()`
+en `src/analytics/queries.js`. Sin eso, cada día del gráfico llevaría las cuatro
+primeras horas del día siguiente — que es el mismo fallo que ya hubo una vez en la
+fecha de las noticias. **Todo agrupamiento por fecha tiene que pasar por `local()`.**
+
+**La IP real ya viene resuelta.** El vhost trae `real_ip_header CF-Connecting-IP` con
+los rangos de Cloudflare en `set_real_ip_from`, así que `$remote_addr` en nginx ya es
+la del visitante. Se lee `X-Real-IP` (un solo valor, que pone nuestro nginx) y no
+`X-Forwarded-For`, que es una lista y la puede falsificar el cliente.
+
+**La geolocalización es un fichero en disco, no una API.** `data/dbip-city-lite.mmdb`,
+unos 124 MB, de DB-IP (licencia CC BY 4.0 — la atribución está al pie del panel, no
+quitarla). Se eligió DB-IP y no GeoLite2 porque MaxMind exige cuenta y clave de
+licencia para cada descarga. **No está en el repo** y está en `.gitignore`, así que
+sobrevive al `git reset --hard` del despliegue igual que el APK — **pero un servidor
+nuevo no lo tendría**: hay que correr `npm run geoip`. Sin el fichero nada se rompe;
+se cae en la cabecera `CF-IPCountry`, que da el país pero no la ciudad. Conviene
+rebajarlo una vez al mes.
+
+**La analítica nunca puede tumbar el sitio.** El beacon responde 204 *antes* de tocar
+la base, la cola de escritura tiene tope (si MariaDB se pone lenta se pierden visitas,
+que es mejor que acumular memoria hasta morir), y todos los fallos se tragan con un
+`log.warn`.
+
+### Entrar
+
+La contraseña solo existe como hash scrypt en el `.env`, que nunca está en el repo:
+
+```bash
+cd /var/www/dolarprice && npm run admin:pass     # pide la contraseña, escupe 2 líneas
+# pegar ADMIN_PASS_HASH y ADMIN_SESSION_SECRET en .env
+systemctl restart dolarprice
+```
+
+Cambiar `ADMIN_SESSION_SECRET` cierra todas las sesiones abiertas; para cambiar solo la
+contraseña, dejar el secret que ya estaba. Seis fallos por IP en quince minutos y se
+cierra la puerta. La cookie va `HttpOnly`, `Secure`, `SameSite=Strict` y firmada con
+HMAC además de guardada en tabla, y en la base solo vive el sha256 del token.
+
+Sin `ADMIN_PASS_HASH` el panel existe pero no deja entrar a nadie. Es a propósito: un
+despliegue en un servidor nuevo no puede quedar abierto mientras alguien se acuerda de
+ponerle contraseña.
+
+### Tablas y retención
+
+`visits` (evento por evento), `visitors` (una fila por persona), `traffic_daily`
+(contadores brutos volcados desde memoria cada minuto), `apk_downloads`,
+`admin_sessions` y `admin_logins`. Se purgan las visitas de más de
+`ANALYTICS_RETENCION_DIAS` (180 por defecto) cada 6 horas desde el propio proceso —
+sin timer de systemd nuevo: son dos consultas, y montar una unidad más en un servidor
+con 11 sitios en producción es riesgo que no compensa. **`visitors` no se purga
+nunca**: ahí vive el "desde cuándo nos visita", que es lo único que no se puede
+recuperar.
+
+### Ojo al tocar el panel
+
+`public/admin.html` lleva su CSS y su JS embebidos, igual que `/promo` y `/app`: así
+cambiarlo **no** obliga a subir el `?v=N` en los tres sitios de siempre. Si en cambio
+se toca `public/app.js` (donde vive el beacon), sí hay que subirlo en `index.html`, en
+la lista `SHELL` de `sw.js` y en la constante `VERSION` de ese mismo archivo.

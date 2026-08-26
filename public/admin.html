@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0B1210">
+<title>DolarPrice · Estadísticas</title>
+<link rel="icon" href="/icons/favicon-32.png">
+
+<!--
+  Panel de estadísticas. CSS y JS embebidos a propósito, igual que /promo y
+  /app: así tocar el panel no obliga a subir el ?v=N en index.html, en la lista
+  SHELL de sw.js y en su constante VERSION, que es el paso que más se olvida.
+
+  Nada de esto se cachea: el service worker deja pasar /admin y /api/admin sin
+  tocarlos, y el servidor los manda con no-store.
+-->
+
+<style>
+:root {
+  --brand:      #16A34A;
+  --brand-2:    #4ADE80;
+  --teal:       #14B8A6;
+  --binance:    #F0B90B;
+  --violeta:    #A78BFA;
+
+  --bg:         #0B1210;
+  --bg-2:       #0F1A16;
+  --surface:    #131F1A;
+  --surface-2:  #1A2A23;
+  --line:       rgba(255,255,255,.07);
+  --line-2:     rgba(255,255,255,.12);
+  --text:       #EAF2ED;
+  --muted:      #8CA096;
+  --danger:     #F87171;
+
+  --r-sm: 12px;
+  --r:    18px;
+  --r-lg: 26px;
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --tabh: 62px;
+  --ease: cubic-bezier(.32,.72,0,1);
+}
+
+:root[data-theme="light"] {
+  --bg:        #F2F6F3;
+  --bg-2:      #FFFFFF;
+  --surface:   #FFFFFF;
+  --surface-2: #EDF3EF;
+  --line:      rgba(6,32,20,.08);
+  --line-2:    rgba(6,32,20,.14);
+  --text:      #0C1D15;
+  --muted:     #5C7268;
+  --danger:    #DC2626;
+  --brand-2:   #15803D;
+  --teal:      #0F766E;
+  --binance:   #A16207;
+  --violeta:   #6D28D9;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  /* Tipografía del sistema, igual que la app: Roboto en Android y SF Pro en
+     iOS, sin esperar ninguna descarga en una red móvil venezolana. */
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior-y: contain;
+}
+
+/* ─── entrada ─── */
+
+#login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+#login .caja {
+  width: 100%;
+  max-width: 340px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 32px 24px 26px;
+  text-align: center;
+}
+#login h1 { margin: 14px 0 4px; font-size: 1.15rem; letter-spacing: -.01em; }
+#login p  { margin: 0 0 22px; color: var(--muted); font-size: .85rem; }
+#login .logo {
+  width: 54px; height: 54px; border-radius: 16px;
+  background: linear-gradient(140deg, var(--brand), var(--teal));
+  display: grid; place-items: center; margin: 0 auto;
+  font-size: 1.5rem; font-weight: 700; color: #fff;
+}
+
+input[type="password"] {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  padding: 13px 14px;
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .18s;
+}
+input[type="password"]:focus { border-color: var(--brand); }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  color: inherit;
+  background: none;
+}
+
+.btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 13px;
+  border-radius: var(--r-sm);
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+  font-size: .95rem;
+  transition: opacity .18s, transform .12s var(--ease);
+}
+.btn:active { transform: scale(.98); }
+.btn[disabled] { opacity: .55; pointer-events: none; }
+
+.error {
+  margin-top: 14px;
+  color: var(--danger);
+  font-size: .82rem;
+  min-height: 1.1em;
+}
+
+/* ─── armazón ─── */
+
+#panel { display: none; padding-bottom: calc(var(--tabh) + var(--safe-b) + 12px); }
+#panel.on { display: block; }
+
+header {
+  position: sticky; top: 0; z-index: 20;
+  padding: calc(var(--safe-t) + 12px) 16px 10px;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.fila { display: flex; align-items: center; gap: 10px; }
+h1.tit { margin: 0; font-size: 1.08rem; font-weight: 700; letter-spacing: -.02em; flex: 1; }
+
+.vivo {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: .76rem; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--line);
+  padding: 5px 10px; border-radius: 999px;
+  white-space: nowrap;
+}
+.punto {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--brand-2);
+  animation: latido 2.4s infinite;
+}
+@keyframes latido { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+
+.icono {
+  width: 34px; height: 34px; flex: none;
+  border-radius: 11px;
+  background: var(--surface); border: 1px solid var(--line);
+  display: grid; place-items: center;
+  font-size: 1rem;
+  transition: transform .12s var(--ease), background .18s;
+}
+.icono:active { transform: scale(.92); background: var(--surface-2); }
+
+/* selector de rango */
+.rangos {
+  display: flex; gap: 6px; margin-top: 11px;
+  overflow-x: auto; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.rangos::-webkit-scrollbar { display: none; }
+.rango {
+  flex: none;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: .82rem; font-weight: 600;
+  transition: all .18s var(--ease);
+}
+.rango.on {
+  background: var(--brand); border-color: var(--brand); color: #fff;
+}
+
+main { padding: 14px 16px 0; }
+section[hidden] { display: none; }
+
+/* ─── tarjetas ─── */
+
+.rejilla { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.rejilla.tres { grid-template-columns: repeat(3, 1fr); }
+@media (min-width: 620px) {
+  .rejilla { grid-template-columns: repeat(4, 1fr); }
+  .rejilla.tres { grid-template-columns: repeat(3, 1fr); }
+}
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 14px;
+}
+.kpi .et { font-size: .73rem; color: var(--muted); font-weight: 600; letter-spacing: .01em; }
+.kpi .n {
+  font-size: 1.6rem; font-weight: 700; letter-spacing: -.03em;
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.kpi .n.chico { font-size: 1.25rem; }
+.kpi .pie { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.sube { color: var(--brand-2); }
+.baja { color: var(--danger); }
+
+.tarjeta {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px;
+  margin-top: 12px;
+}
+.tarjeta > h2 {
+  margin: 0 0 12px;
+  font-size: .82rem; font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.tarjeta > h2 .apunte {
+  float: right; text-transform: none; letter-spacing: 0;
+  font-weight: 500; opacity: .8;
+}
+
+/* ─── gráficos ─── */
+
+svg { display: block; width: 100%; overflow: visible; }
+.leyenda { display: flex; gap: 14px; margin-top: 10px; font-size: .75rem; color: var(--muted); }
+.leyenda span { display: inline-flex; align-items: center; gap: 5px; }
+.mota { width: 9px; height: 9px; border-radius: 3px; }
+
+.barras { display: flex; align-items: flex-end; gap: 2px; height: 92px; }
+.barras > div {
+  flex: 1;
+  background: linear-gradient(180deg, var(--brand-2), var(--brand));
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: height .4s var(--ease);
+}
+.horas-pie {
+  display: flex; justify-content: space-between;
+  font-size: .68rem; color: var(--muted); margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── listas con barra ─── */
+
+.lista { display: grid; gap: 1px; }
+.item {
+  position: relative;
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: .87rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+/* La barra va detrás del texto, no al lado: así el nombre completo siempre se
+   lee aunque el valor sea largo, que en móvil es lo que rompe estas listas. */
+.item .relleno {
+  position: absolute; inset: 0 auto 0 0;
+  background: color-mix(in srgb, var(--brand) 17%, transparent);
+  border-radius: 10px;
+  z-index: -1;
+  transition: width .5s var(--ease);
+}
+.item .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .val { font-variant-numeric: tabular-nums; font-weight: 600; flex: none; }
+.item .sub { color: var(--muted); font-size: .75rem; flex: none; }
+.bandera { font-size: 1.05rem; flex: none; line-height: 1; }
+
+/* ─── tablas ─── */
+
+.tabla-env { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -15px; padding: 0 15px; }
+table { border-collapse: collapse; width: 100%; font-size: .8rem; white-space: nowrap; }
+th {
+  text-align: left; font-weight: 600; color: var(--muted);
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+  padding: 0 12px 8px 0; border-bottom: 1px solid var(--line);
+}
+td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: none; }
+td.mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .76rem; }
+tr.pulsable { cursor: pointer; }
+tr.pulsable:active td { background: var(--surface-2); }
+
+.etq {
+  display: inline-block;
+  padding: 2px 7px; border-radius: 6px;
+  font-size: .68rem; font-weight: 600;
+  background: var(--surface-2); color: var(--muted);
+}
+.etq.apk { background: color-mix(in srgb, var(--brand) 22%, transparent); color: var(--brand-2); }
+.etq.pwa { background: color-mix(in srgb, var(--teal) 22%, transparent); color: var(--teal); }
+.etq.mal { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger); }
+.etq.bien { background: color-mix(in srgb, var(--brand) 22%, transparent); color: var(--brand-2); }
+
+/* ─── barra de pestañas ─── */
+
+nav.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  height: calc(var(--tabh) + var(--safe-b));
+  padding-bottom: var(--safe-b);
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-top: 1px solid var(--line);
+}
+nav.tabs button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: .64rem; font-weight: 600;
+  transition: color .18s;
+}
+nav.tabs button .g { font-size: 1.15rem; line-height: 1; transition: transform .2s var(--ease); }
+nav.tabs button.on { color: var(--brand-2); }
+nav.tabs button.on .g { transform: translateY(-1px) scale(1.1); }
+
+/* ─── hoja deslizante del detalle ─── */
+
+#hoja {
+  position: fixed; inset: 0; z-index: 50;
+  display: none;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(3px);
+}
+#hoja.on { display: block; }
+#hoja .contenido {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  max-height: 88dvh; overflow-y: auto;
+  background: var(--bg-2);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  border-top: 1px solid var(--line-2);
+  padding: 10px 16px calc(20px + var(--safe-b));
+  animation: subir .3s var(--ease);
+}
+@keyframes subir { from { transform: translateY(100%) } to { transform: none } }
+.agarre {
+  width: 38px; height: 4px; border-radius: 999px;
+  background: var(--line-2); margin: 0 auto 14px;
+}
+
+/* ─── varios ─── */
+
+.vacio { color: var(--muted); font-size: .82rem; text-align: center; padding: 18px 0; }
+.cargando { opacity: .4; transition: opacity .2s; }
+
+#toast {
+  position: fixed; left: 50%; bottom: calc(var(--tabh) + var(--safe-b) + 16px);
+  transform: translate(-50%, 14px);
+  background: var(--surface-2); border: 1px solid var(--line-2);
+  color: var(--text);
+  padding: 10px 16px; border-radius: 999px;
+  font-size: .82rem;
+  opacity: 0; pointer-events: none;
+  transition: opacity .22s, transform .22s var(--ease);
+  z-index: 60;
+  max-width: 88vw; text-align: center;
+}
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+footer {
+  margin-top: 22px; padding: 16px 0 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted); font-size: .7rem; line-height: 1.6;
+}
+footer a { color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ entrada ═══ -->
+<div id="login">
+  <form class="caja" id="formLogin" autocomplete="off">
+    <div class="logo">$</div>
+    <h1>Estadísticas</h1>
+    <p>DolarPrice · panel privado</p>
+    <input type="password" id="pass" placeholder="Contraseña" autocomplete="current-password" required>
+    <button class="btn" type="submit" id="btnEntrar">Entrar</button>
+    <div class="error" id="errLogin"></div>
+  </form>
+</div>
+
+<!-- ═══ panel ═══ -->
+<div id="panel">
+  <header>
+    <div class="fila">
+      <h1 class="tit">Estadísticas</h1>
+      <span class="vivo"><span class="punto"></span><span id="enLinea">—</span> ahora</span>
+      <button class="icono" id="btnRecargar" title="Actualizar" aria-label="Actualizar">↻</button>
+      <button class="icono" id="btnSalir" title="Salir" aria-label="Salir">⏻</button>
+    </div>
+    <div class="rangos" id="rangos">
+      <button class="rango" data-rango="hoy">Hoy</button>
+      <button class="rango on" data-rango="7d">7 días</button>
+      <button class="rango" data-rango="30d">30 días</button>
+      <button class="rango" data-rango="90d">90 días</button>
+      <button class="rango" data-rango="todo">Todo</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ── resumen ── -->
+    <section data-vista="resumen">
+      <div class="rejilla" id="kpis"></div>
+
+      <div class="tarjeta">
+        <h2>Visitas por día</h2>
+        <svg id="graf" viewBox="0 0 320 130" preserveAspectRatio="none" height="130"></svg>
+        <div class="leyenda">
+          <span><i class="mota" style="background:var(--brand-2)"></i> Visitas</span>
+          <span><i class="mota" style="background:var(--teal)"></i> Personas distintas</span>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>A qué hora entran <span class="apunte" id="apunteHora"></span></h2>
+        <div class="barras" id="horas"></div>
+        <div class="horas-pie"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Tráfico bruto <span class="apunte">incluye robots y ficheros</span></h2>
+        <div class="lista" id="trafico"></div>
+      </div>
+    </section>
+
+    <!-- ── público ── -->
+    <section data-vista="publico" hidden>
+      <div class="tarjeta"><h2>Países</h2><div class="lista" id="paises"></div></div>
+      <div class="tarjeta"><h2>Ciudades</h2><div class="lista" id="ciudades"></div></div>
+      <div class="tarjeta"><h2>De dónde vienen <span class="apunte">sitios que enlazan</span></h2><div class="lista" id="referentes"></div></div>
+      <div class="tarjeta"><h2>Navegadores</h2><div class="lista" id="navegadores"></div></div>
+      <div class="tarjeta"><h2>Sistemas</h2><div class="lista" id="sistemas"></div></div>
+      <div class="tarjeta"><h2>Aparatos</h2><div class="lista" id="dispositivos"></div></div>
+      <div class="tarjeta"><h2>Pestañas más vistas</h2><div class="lista" id="pestanas"></div></div>
+      <div class="tarjeta"><h2>Idiomas</h2><div class="lista" id="idiomas"></div></div>
+    </section>
+
+    <!-- ── app ── -->
+    <section data-vista="app" hidden>
+      <div class="rejilla" id="kpisApp"></div>
+
+      <div class="tarjeta">
+        <h2>Cómo abren DolarPrice</h2>
+        <div class="lista" id="modos"></div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Descargas del APK por día</h2>
+        <svg id="grafApk" viewBox="0 0 320 110" preserveAspectRatio="none" height="110"></svg>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Cómo se cuenta esto</h2>
+        <div id="notaApk" style="font-size:.82rem;color:var(--muted);line-height:1.65"></div>
+      </div>
+    </section>
+
+    <!-- ── visitas ── -->
+    <section data-vista="visitas" hidden>
+      <div class="tarjeta">
+        <h2>Últimas visitas <span class="apunte">toca una para ver su historial</span></h2>
+        <div class="tabla-env"><table id="recientes"></table></div>
+      </div>
+      <div class="tarjeta">
+        <h2>IPs que más entran</h2>
+        <div class="tabla-env"><table id="tablaIps"></table></div>
+      </div>
+    </section>
+
+    <!-- ── salud ── -->
+    <section data-vista="salud" hidden>
+      <div class="tarjeta"><h2>Últimas corridas del capturador</h2><div class="tabla-env"><table id="corridas"></table></div></div>
+      <div class="tarjeta"><h2>Tamaño de las tablas</h2><div class="lista" id="tablas"></div></div>
+      <div class="tarjeta"><h2>Sesiones abiertas en el panel</h2><div class="tabla-env"><table id="sesiones"></table></div>
+        <button class="btn" id="btnCerrarTodas" style="background:var(--surface-2);color:var(--danger);margin-top:14px">Cerrar todas las sesiones</button>
+      </div>
+      <div class="tarjeta"><h2>Estado</h2><div class="lista" id="estadoSistema"></div></div>
+
+      <footer>
+        Los datos no salen de este servidor: no hay Google Analytics ni ningún tercero.<br>
+        Geolocalización por <a href="https://db-ip.com" rel="noreferrer noopener" target="_blank">DB-IP</a> (CC BY 4.0).
+      </footer>
+    </section>
+  </main>
+
+  <nav class="tabs" id="navTabs">
+    <button class="on" data-ir="resumen"><span class="g">📊</span>Resumen</button>
+    <button data-ir="publico"><span class="g">🌎</span>Público</button>
+    <button data-ir="app"><span class="g">📱</span>App</button>
+    <button data-ir="visitas"><span class="g">👣</span>Visitas</button>
+    <button data-ir="salud"><span class="g">🩺</span>Salud</button>
+  </nav>
+</div>
+
+<div id="hoja"><div class="contenido"><div class="agarre"></div><div id="hojaCuerpo"></div></div></div>
+<div id="toast"></div>
+
+<script>
+'use strict'
+
+const $ = (s) => document.querySelector(s)
+const $$ = (s) => document.querySelectorAll(s)
+
+const nf = new Intl.NumberFormat('es-VE')
+const num = (n) => nf.format(Number(n || 0))
+
+const estado = { rango: '7d', vista: 'resumen', stats: null, temporizador: null }
+
+/* ─── utilidades ─── */
+
+const vibrar = (ms = 8) => { try { navigator.vibrate?.(ms) } catch {} }
+
+let toastT
+function toast(msg) {
+  const el = $('#toast')
+  el.textContent = msg
+  el.classList.add('on')
+  clearTimeout(toastT)
+  toastT = setTimeout(() => el.classList.remove('on'), 2600)
+}
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+// Bandera emoji a partir del código ISO: sin sprites ni imágenes que cargar.
+const bandera = (cc) =>
+  cc && /^[A-Za-z]{2}$/.test(cc)
+    ? String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65))
+    : '🏳️'
+
+// El servidor manda las fechas en UTC sin zona; el navegador del usuario ya
+// está en hora de Venezuela, así que basta con marcarlas como UTC al leerlas.
+const fecha = (v) => (v ? new Date(String(v).replace(' ', 'T') + 'Z') : null)
+
+function hace(v) {
+  const d = fecha(v)
+  if (!d) return '—'
+  const seg = Math.round((Date.now() - d.getTime()) / 1000)
+  if (seg < 60) return 'hace ' + seg + ' s'
+  if (seg < 3600) return 'hace ' + Math.round(seg / 60) + ' min'
+  if (seg < 86400) return 'hace ' + Math.round(seg / 3600) + ' h'
+  return 'hace ' + Math.round(seg / 86400) + ' d'
+}
+
+const hora = (v) => {
+  const d = fecha(v)
+  return d ? d.toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
+}
+
+function duracion(seg) {
+  if (!seg) return '—'
+  if (seg < 60) return seg + ' s'
+  const m = Math.floor(seg / 60)
+  return m < 60 ? m + ' min ' + (seg % 60) + ' s' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'
+}
+
+/* ─── llamadas ─── */
+
+async function api(ruta, opciones = {}) {
+  const res = await fetch(ruta, {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    ...opciones,
+    headers: { 'Content-Type': 'application/json', ...(opciones.headers || {}) },
+  })
+  if (res.status === 401) { mostrarLogin(); throw new Error('sesion') }
+  const datos = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(datos.error || 'Error ' + res.status)
+  return datos
+}
+
+/* ─── entrada ─── */
+
+function mostrarLogin() {
+  $('#panel').classList.remove('on')
+  $('#login').style.display = 'grid'
+  clearInterval(estado.temporizador)
+  estado.temporizador = null
+}
+
+function mostrarPanel() {
+  $('#login').style.display = 'none'
+  $('#panel').classList.add('on')
+  if (!estado.temporizador) estado.temporizador = setInterval(refrescarSuave, 30000)
+}
+
+$('#formLogin').addEventListener('submit', async (e) => {
+  e.preventDefault()
+  const btn = $('#btnEntrar')
+  const err = $('#errLogin')
+  btn.disabled = true
+  btn.textContent = 'Comprobando…'
+  err.textContent = ''
+  try {
+    await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ pass: $('#pass').value }) })
+    $('#pass').value = ''
+    mostrarPanel()
+    await cargarTodo()
+  } catch (e2) {
+    err.textContent = e2.message
+    vibrar(40)
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'Entrar'
+  }
+})
+
+$('#btnSalir').addEventListener('click', async () => {
+  vibrar()
+  try { await api('/api/admin/logout', { method: 'POST' }) } catch {}
+  mostrarLogin()
+})
+
+/* ─── navegación ─── */
+
+$$('#navTabs button').forEach((b) => b.addEventListener('click', () => {
+  vibrar()
+  estado.vista = b.dataset.ir
+  $$('#navTabs button').forEach((o) => o.classList.toggle('on', o === b))
+  $$('section[data-vista]').forEach((s) => { s.hidden = s.dataset.vista !== estado.vista })
+  scrollTo({ top: 0, behavior: 'smooth' })
+  if (estado.vista === 'visitas') cargarVisitas()
+  if (estado.vista === 'salud') cargarSalud()
+}))
+
+$$('#rangos .rango').forEach((b) => b.addEventListener('click', () => {
+  vibrar()
+  estado.rango = b.dataset.rango
+  $$('#rangos .rango').forEach((o) => o.classList.toggle('on', o === b))
+  cargarStats()
+  if (estado.vista === 'visitas') cargarVisitas()
+}))
+
+$('#btnRecargar').addEventListener('click', () => {
+  vibrar()
+  $('#btnRecargar').style.transform = 'rotate(360deg)'
+  setTimeout(() => { $('#btnRecargar').style.transform = '' }, 400)
+  cargarTodo()
+})
+
+/* ─── pintado: piezas reutilizables ─── */
+
+/**
+ * Lista con barra de fondo proporcional. `filas` = [{clave, visitas, ...}].
+ * El ancho se calcula contra el máximo de la lista y no contra el total: si
+ * un país se lleva el 95% del tráfico —que es el caso de Venezuela aquí— con
+ * el total todas las demás barras serían invisibles.
+ */
+function pintarLista(destino, filas, opciones = {}) {
+  const el = typeof destino === 'string' ? $(destino) : destino
+  if (!filas || !filas.length) { el.innerHTML = '<div class="vacio">Sin datos todavía</div>'; return }
+  const tope = Math.max(...filas.map((f) => f.visitas || 0), 1)
+
+  el.innerHTML = filas.map((f) => {
+    const pct = Math.max(2, Math.round(((f.visitas || 0) / tope) * 100))
+    const icono = opciones.banderas ? '<span class="bandera">' + bandera(f.cc) + '</span>' : ''
+    const nombre = opciones.nombre ? opciones.nombre(f) : (f.nombre || f.clave || '—')
+    const sub = f.visitantes !== undefined ? '<span class="sub">' + num(f.visitantes) + ' pers.</span>' : ''
+    return '<div class="item">' +
+      '<span class="relleno" style="width:' + pct + '%"></span>' +
+      icono +
+      '<span class="nom">' + esc(nombre) + '</span>' +
+      sub +
+      '<span class="val">' + num(f.visitas) + '</span>' +
+      '</div>'
+  }).join('')
+}
+
+function tarjetaKpi(etiqueta, valor, pie, clase) {
+  return '<div class="kpi">' +
+    '<div class="et">' + esc(etiqueta) + '</div>' +
+    '<div class="n' + (clase || '') + '">' + valor + '</div>' +
+    (pie ? '<div class="pie">' + pie + '</div>' : '') +
+    '</div>'
+}
+
+/* ─── gráfico de área ───────────────────────────────────────────────────────
+   A mano, igual que el histórico de la app: dos series sobre el mismo eje, sin
+   ninguna librería que descargar. El viewBox es 320×130 y el SVG se estira con
+   preserveAspectRatio="none", así que las líneas llevan vector-effect para no
+   engordar al escalar. */
+function pintarArea(svgSel, puntos, series) {
+  const svg = $(svgSel)
+  if (!puntos || puntos.length < 2) {
+    svg.innerHTML = '<text x="160" y="66" text-anchor="middle" fill="currentColor" opacity=".45" font-size="11">Aún no hay suficientes días</text>'
+    return
+  }
+
+  const W = 320, H = 130, MT = 8, MB = 18
+  const tope = Math.max(...puntos.flatMap((p) => series.map((s) => p[s.campo] || 0)), 1)
+  const x = (i) => (i / (puntos.length - 1)) * W
+  const y = (v) => MT + (1 - (v || 0) / tope) * (H - MT - MB)
+
+  const trozos = series.map((s, idx) => {
+    const linea = puntos.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p[s.campo]).toFixed(1)).join(' ')
+    const area = linea + ' L' + W + ' ' + (H - MB) + ' L0 ' + (H - MB) + ' Z'
+    return (s.area
+      ? '<path d="' + area + '" fill="url(#deg' + idx + ')"/>'
+      : '') +
+      '<path d="' + linea + '" fill="none" stroke="' + s.color + '" stroke-width="2.2" ' +
+      'stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"' +
+      (s.punteada ? ' stroke-dasharray="4 3"' : '') + '/>'
+  }).join('')
+
+  const degradados = series.map((s, idx) =>
+    '<linearGradient id="deg' + idx + '" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="' + s.color + '" stop-opacity=".38"/>' +
+    '<stop offset="100%" stop-color="' + s.color + '" stop-opacity="0"/>' +
+    '</linearGradient>').join('')
+
+  // Solo tres etiquetas en el eje: en un móvil de 360 px cualquier cosa más se
+  // amontona hasta volverse ilegible.
+  const eje = [0, Math.floor((puntos.length - 1) / 2), puntos.length - 1]
+    .filter((i, n, a) => a.indexOf(i) === n)
+    .map((i) => {
+      const d = new Date(puntos[i].fecha + 'T12:00:00Z')
+      const t = d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })
+      const anclaje = i === 0 ? 'start' : i === puntos.length - 1 ? 'end' : 'middle'
+      return '<text x="' + x(i).toFixed(1) + '" y="' + (H - 4) + '" text-anchor="' + anclaje +
+             '" fill="currentColor" opacity=".45" font-size="9">' + t + '</text>'
+    }).join('')
+
+  svg.innerHTML = '<defs>' + degradados + '</defs>' + trozos + eje
+}
+
+/* ─── carga de datos ─── */
+
+async function cargarStats() {
+  $('main').classList.add('cargando')
+  try {
+    const d = await api('/api/admin/stats?rango=' + estado.rango)
+    estado.stats = d
+    pintarResumen(d)
+    pintarPublico(d)
+    pintarApp(d)
+  } catch (e) {
+    if (e.message !== 'sesion') toast(e.message)
+  } finally {
+    $('main').classList.remove('cargando')
+  }
+}
+
+function pintarResumen(d) {
+  const r = d.resumen
+  $('#enLinea').textContent = num(r.enLinea)
+
+  const flecha = r.variacion === null ? ''
+    : '<span class="' + (r.variacion >= 0 ? 'sube' : 'baja') + '">' +
+      (r.variacion >= 0 ? '▲' : '▼') + ' ' + Math.abs(r.variacion) + '%</span> vs. antes'
+
+  $('#kpis').innerHTML =
+    tarjetaKpi('Visitas', num(r.visitas), flecha) +
+    tarjetaKpi('Personas', num(r.visitantes), num(r.sesiones) + ' sesiones') +
+    tarjetaKpi('IPs únicas', num(r.ips), '') +
+    tarjetaKpi('Nuevos', num(r.nuevos), num(r.recurrentes) + ' repiten') +
+    tarjetaKpi('Duración media', duracion(r.duracionMediaSeg), 'por visita', ' chico') +
+    tarjetaKpi('Ahora mismo', num(r.enLinea), 'últimos 5 min')
+
+  pintarArea('#graf', d.serie, [
+    { campo: 'visitas', color: 'var(--brand-2)', area: true },
+    { campo: 'visitantes', color: 'var(--teal)' },
+  ])
+
+  // Horas
+  const tope = Math.max(...d.horas.map((h) => h.visitas), 1)
+  $('#horas').innerHTML = d.horas.map((h) =>
+    '<div style="height:' + Math.max(2, (h.visitas / tope) * 100) + '%" title="' +
+    String(h.hora).padStart(2, '0') + ':00 · ' + num(h.visitas) + '"></div>').join('')
+
+  const pico = d.horas.reduce((a, b) => (b.visitas > a.visitas ? b : a), d.horas[0])
+  $('#apunteHora').textContent = pico && pico.visitas
+    ? 'pico a las ' + String(pico.hora).padStart(2, '0') + ':00'
+    : ''
+
+  // Tráfico bruto
+  const t = d.trafico.reduce((a, f) => ({
+    peticiones: a.peticiones + f.peticiones, api: a.api + f.api, bots: a.bots + f.bots,
+  }), { peticiones: 0, api: 0, bots: 0 })
+  pintarLista('#trafico', [
+    { clave: 'Peticiones totales', visitas: t.peticiones },
+    { clave: 'Llamadas a la API', visitas: t.api },
+    { clave: 'Robots y rastreadores', visitas: t.bots },
+  ])
+}
+
+function pintarPublico(d) {
+  pintarLista('#paises', d.paises, { banderas: true })
+  pintarLista('#ciudades', d.ciudades, { banderas: true })
+  pintarLista('#referentes', d.referentes)
+  pintarLista('#navegadores', d.navegadores)
+  pintarLista('#sistemas', d.sistemas)
+  pintarLista('#dispositivos', d.dispositivos, {
+    nombre: (f) => ({ movil: 'Teléfono', tablet: 'Tablet', escritorio: 'Computadora' }[f.clave] || f.clave),
+  })
+  pintarLista('#pestanas', d.pestanas, {
+    nombre: (f) => ({ inicio: 'Inicio', monedas: 'Monedas', noticias: 'Noticias', historial: 'Histórico' }[f.clave] || f.clave),
+  })
+  pintarLista('#idiomas', d.idiomas)
+}
+
+function pintarApp(d) {
+  const a = d.apk
+
+  $('#kpisApp').innerHTML =
+    tarjetaKpi('Usan el APK', num(a.usanApk), num(a.visitasApk) + ' visitas') +
+    tarjetaKpi('Descargas', num(a.descargasUnicas), num(a.descargas) + ' peticiones') +
+    tarjetaKpi('PWA instalada', num(a.usanPwa), num(a.instalacionesPwa) + ' instalaron') +
+    tarjetaKpi('Por navegador', num(a.usanNavegador), '')
+
+  pintarLista('#modos', [
+    { clave: 'Desde el APK', visitas: a.usanApk },
+    { clave: 'Desde la PWA instalada', visitas: a.usanPwa },
+    { clave: 'Desde el navegador', visitas: a.usanNavegador },
+  ])
+
+  pintarArea('#grafApk', a.serie, [{ campo: 'descargas', color: 'var(--violeta)', area: true }])
+
+  const pct = a.consultadosApk > 0 ? Math.round((a.conApkInstalado / a.consultadosApk) * 100) : null
+  $('#notaApk').innerHTML =
+    '<b>Usan el APK</b>: personas distintas que abrieron la app desde el APK instalado. Se sabe porque ' +
+    'Android pone el referente en <code>android-app://com.dolarprice.twa</code> al lanzarla, y eso no ' +
+    'lo puede fingir un navegador.<br><br>' +
+    '<b>Descargas</b>: IPs distintas que se bajaron el archivo. Es la mitad de arriba del embudo — ' +
+    'bajarlo no es instalarlo, y no hay forma de saber quién lo instaló y nunca lo abrió.<br><br>' +
+    '<b>Ya lo tienen instalado</b>: ' +
+    (pct === null
+      ? 'todavía sin datos. Solo Chrome en Android sabe responder esto.'
+      : num(a.conApkInstalado) + ' de ' + num(a.consultadosApk) + ' personas que entraron por navegador (' +
+        pct + '%) ya tienen el APK en el teléfono. El resto de navegadores no responde a esa pregunta, ' +
+        'así que no entran en la cuenta.') +
+    '<br><br><b>No existe</b> un número de instalaciones como el de Google Play: la app no está publicada ahí.'
+}
+
+async function cargarVisitas() {
+  try {
+    const [rec, ips] = await Promise.all([
+      api('/api/admin/recientes?limit=60'),
+      api('/api/admin/ips?rango=' + estado.rango + '&limit=25'),
+    ])
+
+    $('#recientes').innerHTML =
+      '<thead><tr><th>Cuándo</th><th>Dónde</th><th>IP</th><th>Aparato</th><th>Vino de</th><th>Pestaña</th></tr></thead><tbody>' +
+      (rec.visitas.length ? rec.visitas.map((v) =>
+        '<tr class="pulsable" data-id="' + esc(v.visitor_id) + '">' +
+        '<td>' + hace(v.created_at) + '</td>' +
+        '<td>' + bandera(v.country_code) + ' ' + esc(v.city || v.country || '—') + '</td>' +
+        '<td class="mono">' + esc(v.ip) + '</td>' +
+        '<td>' + esc(v.browser || '—') + ' · ' + esc(v.os || '—') +
+          (v.modo && v.modo !== 'navegador' ? ' <span class="etq ' + esc(v.modo) + '">' + esc(v.modo.toUpperCase()) + '</span>' : '') + '</td>' +
+        '<td>' + esc(v.ref_host || 'directo') + '</td>' +
+        '<td>' + esc(v.tab || '—') + '</td></tr>').join('')
+        : '<tr><td colspan="6" class="vacio">Sin visitas todavía</td></tr>') +
+      '</tbody>'
+
+    $$('#recientes tr.pulsable').forEach((tr) =>
+      tr.addEventListener('click', () => abrirVisitante({ id: tr.dataset.id })))
+
+    $('#tablaIps').innerHTML =
+      '<thead><tr><th>IP</th><th>Dónde</th><th>Visitas</th><th>Personas</th><th>Última</th></tr></thead><tbody>' +
+      (ips.ips.length ? ips.ips.map((f) =>
+        '<tr class="pulsable" data-ip="' + esc(f.ip) + '">' +
+        '<td class="mono">' + esc(f.ip) + '</td>' +
+        '<td>' + bandera(f.cc) + ' ' + esc(f.ciudad || f.pais || '—') + '</td>' +
+        '<td class="mono">' + num(f.visitas) + '</td>' +
+        '<td class="mono">' + num(f.personas) + '</td>' +
+        '<td>' + hace(f.ultima) + '</td></tr>').join('')
+        : '<tr><td colspan="5" class="vacio">Sin datos</td></tr>') +
+      '</tbody>'
+
+    $$('#tablaIps tr.pulsable').forEach((tr) =>
+      tr.addEventListener('click', () => abrirVisitante({ ip: tr.dataset.ip })))
+  } catch (e) {
+    if (e.message !== 'sesion') toast(e.message)
+  }
+}
+
+async function cargarSalud() {
+  try {
+    const d = await api('/api/admin/salud')
+
+    $('#corridas').innerHTML =
+      '<thead><tr><th>Fuente</th><th>Estado</th><th>Cuándo</th><th>Tardó</th><th>Mensaje</th></tr></thead><tbody>' +
+      (d.corridas.length ? d.corridas.map((c) =>
+        '<tr><td>' + esc(c.source) + '</td>' +
+        '<td><span class="etq ' + (c.ok ? 'bien' : 'mal') + '">' + (c.ok ? 'OK' : 'FALLÓ') + '</span></td>' +
+        '<td>' + hace(c.ran_at) + '</td>' +
+        '<td class="mono">' + (c.duration_ms ? c.duration_ms + ' ms' : '—') + '</td>' +
+        '<td>' + esc(c.message || '') + '</td></tr>').join('')
+        : '<tr><td colspan="5" class="vacio">Sin corridas</td></tr>') +
+      '</tbody>'
+
+    pintarLista('#tablas', d.tablas.map((t) => ({ clave: t.tabla, visitas: Number(t.mb || 0) })), {
+      nombre: (f) => f.clave,
+    })
+    // La barra mide MB, no visitas: se reetiqueta el valor a mano.
+    $$('#tablas .item .val').forEach((el, i) => { el.textContent = (d.tablas[i]?.mb ?? 0) + ' MB' })
+
+    $('#sesiones').innerHTML =
+      '<thead><tr><th>Desde</th><th>IP</th><th>Última actividad</th><th>Caduca</th></tr></thead><tbody>' +
+      (d.sesiones.length ? d.sesiones.map((s) =>
+        '<tr><td>' + hora(s.creada) + '</td>' +
+        '<td class="mono">' + esc(s.ip || '—') + '</td>' +
+        '<td>' + hace(s.ultima) + '</td>' +
+        '<td>' + hora(s.expira) + '</td></tr>').join('')
+        : '<tr><td colspan="4" class="vacio">Ninguna</td></tr>') +
+      '</tbody>'
+
+    pintarLista('#estadoSistema', [
+      { clave: 'Tasas guardadas', visitas: d.tasas },
+      { clave: d.geoip ? 'Geolocalización: base cargada' : 'Geolocalización: SIN base (solo país)', visitas: d.geoip ? 1 : 0 },
+      { clave: 'Días de detalle que se conservan', visitas: d.retencionDias },
+    ])
+  } catch (e) {
+    if (e.message !== 'sesion') toast(e.message)
+  }
+}
+
+$('#btnCerrarTodas').addEventListener('click', async () => {
+  vibrar(20)
+  try {
+    await api('/api/admin/sesiones/cerrar-todas', { method: 'POST' })
+    toast('Sesiones cerradas. Hay que entrar de nuevo.')
+    setTimeout(mostrarLogin, 1200)
+  } catch (e) {
+    if (e.message !== 'sesion') toast(e.message)
+  }
+})
+
+/* ─── detalle de una persona ─── */
+
+async function abrirVisitante(clave) {
+  vibrar()
+  const hoja = $('#hoja')
+  $('#hojaCuerpo').innerHTML = '<div class="vacio">Cargando…</div>'
+  hoja.classList.add('on')
+
+  try {
+    const q = clave.id ? 'id=' + encodeURIComponent(clave.id) : 'ip=' + encodeURIComponent(clave.ip)
+    const d = await api('/api/admin/visitante?' + q)
+    const f = d.ficha[0]
+
+    $('#hojaCuerpo').innerHTML =
+      '<h2 style="margin:0 0 4px;font-size:1rem">' +
+        (f ? bandera(f.country_code) + ' ' + esc(f.city || f.country || 'Sin ubicar') : 'Visitante') +
+      '</h2>' +
+      '<p style="margin:0 0 16px;color:var(--muted);font-size:.8rem">' +
+        (clave.ip ? 'IP ' + esc(clave.ip) : 'ID ' + esc(String(clave.id).slice(0, 12)) + '…') +
+      '</p>' +
+      '<div class="rejilla tres">' +
+        tarjetaKpi('Visitas', num(f?.visitas ?? d.totales?.eventos ?? 0), '') +
+        tarjetaKpi('Sesiones', num(d.totales?.sesiones), '') +
+        tarjetaKpi('Primera vez', f ? hace(f.primera) : hace(d.totales?.primera), '', ' chico') +
+      '</div>' +
+      '<div class="tarjeta"><h2>Recorrido</h2><div class="tabla-env"><table>' +
+      '<thead><tr><th>Cuándo</th><th>Qué</th><th>Dónde</th><th>Desde</th></tr></thead><tbody>' +
+      (d.historial.length ? d.historial.map((h) =>
+        '<tr><td>' + hora(h.created_at) + '</td>' +
+        '<td>' + esc(h.event === 'view' ? 'Entró' : h.event === 'tab' ? 'Pestaña ' + (h.tab || '') :
+                     h.event === 'fin' ? 'Salió (' + duracion(Math.round((h.duracion_ms || 0) / 1000)) + ')' :
+                     'Instaló la app') + '</td>' +
+        '<td>' + esc(h.city || h.country || '—') + '</td>' +
+        '<td>' + esc(h.ref_host || 'directo') + ' · ' + esc(h.modo || '') + '</td></tr>').join('')
+        : '<tr><td colspan="4" class="vacio">Sin historial</td></tr>') +
+      '</tbody></table></div></div>'
+  } catch (e) {
+    if (e.message !== 'sesion') $('#hojaCuerpo').innerHTML = '<div class="vacio">' + esc(e.message) + '</div>'
+  }
+}
+
+$('#hoja').addEventListener('click', (e) => {
+  // Solo cierra al tocar el fondo, no al tocar dentro de la hoja.
+  if (e.target === $('#hoja')) $('#hoja').classList.remove('on')
+})
+
+addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#hoja').classList.remove('on') })
+
+/* ─── refresco ─── */
+
+// Cada 30 s, y solo si la pestaña está a la vista: no tiene sentido consultar
+// en segundo plano, y menos desde un teléfono con datos móviles.
+async function refrescarSuave() {
+  if (document.visibilityState !== 'visible') return
+  try {
+    const d = await api('/api/admin/stats?rango=' + estado.rango)
+    estado.stats = d
+    pintarResumen(d)
+    pintarPublico(d)
+    pintarApp(d)
+  } catch {}
+}
+
+async function cargarTodo() {
+  await cargarStats()
+  if (estado.vista === 'visitas') await cargarVisitas()
+  if (estado.vista === 'salud') await cargarSalud()
+}
+
+/* ─── arranque ─── */
+
+;(async () => {
+  try {
+    const s = await api('/api/admin/sesion')
+    if (s.dentro) { mostrarPanel(); await cargarTodo() }
+    else {
+      mostrarLogin()
+      if (!s.configurado) {
+        $('#errLogin').textContent = 'Falta configurar la contraseña en el servidor: npm run admin:pass'
+      }
+    }
+  } catch {
+    mostrarLogin()
+  }
+})()
+</script>
+</body>
+</html>
