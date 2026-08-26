@@ -192,7 +192,13 @@ que es mejor que acumular memoria hasta morir), y todos los fallos se tragan con
 
 ### Entrar
 
-La contraseña solo existe como hash scrypt en el `.env`, que nunca está en el repo:
+Se entra con **correo y contraseña**. Los dos viven en la tabla `admin_config`, no en el
+`.env`, para poder cambiarlos desde la pestaña **Cuenta** del propio panel sin entrar por
+SSH ni reiniciar el servicio. El `.env` sigue sirviendo de arranque: mientras esa tabla
+esté vacía manda `ADMIN_PASS_HASH`, y en cuanto se cambia algo desde el panel manda la
+tabla. El correo por defecto es `digitalgroup21@gmail.com`.
+
+Para el arranque en un servidor nuevo, o si se pierde el acceso:
 
 ```bash
 cd /var/www/dolarprice && npm run admin:pass     # pide la contraseña, escupe 2 líneas
@@ -200,14 +206,38 @@ cd /var/www/dolarprice && npm run admin:pass     # pide la contraseña, escupe 2
 systemctl restart dolarprice
 ```
 
+**Ojo:** si ya se cambió la contraseña desde el panel, tocar `ADMIN_PASS_HASH` no sirve
+de nada — manda la fila `pass_hash` de `admin_config`. Para volver al `.env` hay que
+borrarla: `DELETE FROM admin_config WHERE clave = 'pass_hash'`.
+
 Cambiar `ADMIN_SESSION_SECRET` cierra todas las sesiones abiertas; para cambiar solo la
 contraseña, dejar el secret que ya estaba. Seis fallos por IP en quince minutos y se
 cierra la puerta. La cookie va `HttpOnly`, `Secure`, `SameSite=Strict` y firmada con
 HMAC además de guardada en tabla, y en la base solo vive el sha256 del token.
 
-Sin `ADMIN_PASS_HASH` el panel existe pero no deja entrar a nadie. Es a propósito: un
+Cambiar la contraseña desde el panel exige la actual y confirmarla, y **cierra las demás
+sesiones abiertas menos la propia**: si alguien más la tenía abierta, cambiar la clave no
+serviría de nada mientras siguiera dentro.
+
+Sin contraseña configurada el panel existe pero no deja entrar a nadie. Es a propósito: un
 despliegue en un servidor nuevo no puede quedar abierto mientras alguien se acuerda de
 ponerle contraseña.
+
+Al equivocarse, el mensaje es el mismo tanto si falla el correo como si falla la clave, y
+la contraseña se verifica igual aunque el correo ya haya fallado — si no, el tiempo de
+respuesta delataría cuál de los dos estaba mal.
+
+### Ojo con el diseño
+
+El panel tiene **dos formatos, no uno estirado**: barra lateral a partir de 960 px y barra
+de pestañas abajo por debajo. La primera versión servía la interfaz de teléfono estirada a
+1900 px y quedaba fatal — tarjetas enormes vacías y emojis por iconos.
+
+Los gráficos **calculan su `viewBox` con el ancho real en píxeles**. No usar
+`preserveAspectRatio="none"` con una caja fija: en un monitor ancho deforma hasta las
+letras. Como el ancho depende de la ventana, hay que llamar a `redibujar()` al
+redimensionar **y al cambiar de pestaña** — un SVG dentro de una `section[hidden]` mide
+0 px y saldría vacío.
 
 ### Tablas y retención
 
