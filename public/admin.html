@@ -493,6 +493,7 @@ footer a { color: var(--muted); }
   <symbol id="i-recargar" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 3.5V9H15"/></symbol>
   <symbol id="i-salir" viewBox="0 0 24 24"><path d="M9.5 20.5H5.5a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2h4"/><path d="M16 16.5l4.5-4.5L16 7.5"/><path d="M20.5 12H9.5"/></symbol>
   <symbol id="i-nada" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12h7"/></symbol>
+  <symbol id="i-referidos" viewBox="0 0 24 24"><circle cx="8" cy="7.5" r="3.2"/><path d="M2.5 20v-1a4.5 4.5 0 0 1 4.5-4.5h2"/><path d="M14.5 8.5h6"/><path d="M17.5 5.5v6"/><path d="M12 20.5v-1.2a3.8 3.8 0 0 1 3.8-3.8h2.9a3.8 3.8 0 0 1 3.8 3.8v1.2"/></symbol>
   <symbol id="i-ojo" viewBox="0 0 24 24"><path d="M2 12s3.8-6.4 10-6.4S22 12 22 12s-3.8 6.4-10 6.4S2 12 2 12z"/><circle cx="12" cy="12" r="2.7"/></symbol>
   <symbol id="i-ojo-no" viewBox="0 0 24 24"><path d="M10.7 6.1A10 10 0 0 1 12 6c6.2 0 10 6 10 6a18.4 18.4 0 0 1-3.1 3.7"/><path d="M6.2 7.7A17.7 17.7 0 0 0 2 12s3.8 6 10 6a9.8 9.8 0 0 0 4-.8"/><path d="M3.5 3.5l17 17"/></symbol>
 </defs></svg>
@@ -531,6 +532,7 @@ footer a { color: var(--muted); }
       <button data-ir="app"><svg class="ic"><use href="#i-app"/></svg>App</button>
       <button data-ir="visitas"><svg class="ic"><use href="#i-visitas"/></svg>Visitas</button>
       <button data-ir="salud"><svg class="ic"><use href="#i-salud"/></svg>Salud</button>
+      <button data-ir="referidos"><svg class="ic"><use href="#i-referidos"/></svg>Referidos</button>
       <button data-ir="cuenta"><svg class="ic"><use href="#i-cuenta"/></svg>Cuenta</button>
     </nav>
     <div class="pie">
@@ -646,6 +648,71 @@ footer a { color: var(--muted); }
         </footer>
       </section>
 
+      <!-- ── referidos ── -->
+      <section data-vista="referidos" hidden>
+        <div class="caja" id="cajaInterruptor" style="margin-top:0"></div>
+
+        <div class="kpis" id="kpisRef" style="margin-top:12px"></div>
+
+        <div class="caja">
+          <h2>Retiros pendientes de pago <span class="apunte">se pagan a mano desde tu Binance</span></h2>
+          <div class="scrollx"><table id="tablaPagos"></table></div>
+        </div>
+
+        <div class="caja">
+          <h2>Marcados para revisar <span class="apunte">llegaron al umbral pero NO se pagaron solos</span></h2>
+          <div class="scrollx"><table id="tablaMarcados"></table></div>
+        </div>
+
+        <div class="caja">
+          <h2>Quién ha traído gente</h2>
+          <div class="scrollx"><table id="tablaRefUsuarios"></table></div>
+        </div>
+
+        <div class="mosaico dos" style="margin-top:12px">
+          <div class="caja">
+            <h2>Reglas del programa</h2>
+            <form class="formulario" id="formAjustes" autocomplete="off">
+              <div class="campo">
+                <label for="aRecompensa">Se paga por cada referido válido (USD)</label>
+                <input type="number" id="aRecompensa" step="0.01" min="0" max="5" required>
+              </div>
+              <div class="campo">
+                <label for="aMinimo">Mínimo para poder retirar (USD)</label>
+                <input type="number" id="aMinimo" step="0.5" min="0.5" max="500" required>
+              </div>
+              <div class="campo">
+                <label for="aTope">Tope de gasto al mes (USD) · 0 = sin tope</label>
+                <input type="number" id="aTope" step="10" min="0" max="100000" required>
+              </div>
+              <div class="campo">
+                <label for="aDias">Días distintos que debe usar la app el referido</label>
+                <input type="number" id="aDias" step="1" min="1" max="30" required>
+              </div>
+              <div class="campo">
+                <label for="aCuarentena">Días de cuarentena antes de poder retirar</label>
+                <input type="number" id="aCuarentena" step="1" min="0" max="90" required>
+              </div>
+              <div class="campo">
+                <label for="aMaxIp">Máximo de referidos desde una misma IP</label>
+                <input type="number" id="aMaxIp" step="1" min="1" max="50" required>
+              </div>
+              <div class="campo">
+                <label for="aTopeDia">Máximo que puede validar una persona al día</label>
+                <input type="number" id="aTopeDia" step="1" min="1" max="1000" required>
+              </div>
+              <button class="btn" type="submit">Guardar reglas</button>
+              <div class="aviso" id="avisoAjustes"></div>
+            </form>
+          </div>
+
+          <div class="caja">
+            <h2>Últimos referidos</h2>
+            <div class="scrollx"><table id="tablaUltimosRef"></table></div>
+          </div>
+        </div>
+      </section>
+
       <!-- ── cuenta ── -->
       <section data-vista="cuenta" hidden>
         <div class="mosaico dos">
@@ -722,7 +789,7 @@ const num = (n) => nf.format(Number(n || 0))
 
 const TITULOS = {
   resumen: 'Resumen', publico: 'Público', app: 'App',
-  visitas: 'Visitas', salud: 'Salud', cuenta: 'Cuenta',
+  visitas: 'Visitas', salud: 'Salud', referidos: 'Referidos', cuenta: 'Cuenta',
 }
 
 const estado = { rango: '7d', vista: 'resumen', stats: null, reloj: null }
@@ -921,12 +988,14 @@ $$('#nav button').forEach((b) => b.addEventListener('click', () => {
   $$('section[data-vista]').forEach((s) => { s.hidden = s.dataset.vista !== estado.vista })
   $('#titulo').textContent = TITULOS[estado.vista]
   // El selector de rango no pinta nada en Cuenta ni en Salud.
-  $('#rangos').style.display = (estado.vista === 'cuenta' || estado.vista === 'salud') ? 'none' : 'flex'
+  $('#rangos').style.display =
+    ['cuenta', 'salud', 'referidos'].includes(estado.vista) ? 'none' : 'flex'
   scrollTo({ top: 0, behavior: 'smooth' })
 
   if (estado.vista === 'visitas') cargarVisitas()
   if (estado.vista === 'salud') cargarSalud()
   if (estado.vista === 'cuenta') cargarPerfil()
+  if (estado.vista === 'referidos') cargarReferidos()
   // Los SVG de una sección oculta miden 0 px de ancho: hay que redibujarlos al
   // mostrarla o salen vacíos.
   redibujar()
@@ -1348,6 +1417,263 @@ $('#btnCerrarTodas').addEventListener('click', async () => {
   }
 })
 
+/* ─── referidos ─────────────────────────────────────────────────────────────
+   Aquí se decide sobre dinero, así que nada pasa solo: pagar un retiro,
+   aprobar un referido marcado o bloquear a alguien son acciones explícitas y
+   con confirmación. */
+
+const usd = (v) => '$' + Number(v || 0).toFixed(2)
+
+async function cargarReferidos() {
+  try {
+    const [d, pagos] = await Promise.all([
+      api('/api/admin/referidos'),
+      api('/api/admin/referidos/pagos?estado=pendiente'),
+    ])
+    estado.ref = d
+    pintarInterruptor(d)
+    pintarKpisRef(d)
+    pintarPagos(pagos.pagos)
+    pintarMarcados(d.marcadosLista)
+    pintarRefUsuarios(d.top)
+    pintarUltimosRef(d.ultimos)
+    rellenarAjustes(d.ajustes)
+  } catch (e) {
+    if (!e.caducada) toast(e.message)
+  }
+}
+
+function pintarInterruptor(d) {
+  const a = d.ajustes
+  const queda = a.topeMensual > 0 ? Math.max(0, a.topeMensual - d.gastadoEsteMes) : null
+
+  $('#cajaInterruptor').innerHTML =
+    '<h2>Estado del programa</h2>' +
+    '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">' +
+      '<span class="etq ' + (a.activo ? 'bien' : 'mal') + '" style="font-size:.8rem;padding:6px 12px">' +
+        (a.activo ? 'ENCENDIDO' : 'APAGADO') + '</span>' +
+      '<button class="btn ' + (a.activo ? 'peligro' : '') + '" id="btnInterruptor" ' +
+        'style="width:auto;padding:10px 20px;margin:0">' +
+        (a.activo ? 'Apagar el programa' : 'Encender el programa') + '</button>' +
+      '<span style="font-size:.8rem;color:var(--muted)">' +
+        (d.correo ? 'Correos por ' + esc(d.correo)
+                  : 'Sin envío de correos: nadie podrá verificar su cuenta') +
+      '</span>' +
+    '</div>' +
+    '<p class="pista" style="margin-top:12px">' +
+      (a.activo
+        ? 'Los usuarios ven la tarjeta de Comparte y gana, y se están acumulando saldos reales.'
+        : 'Apagado: los usuarios no ven nada y no se valida ni se acumula nada. Lo ya ganado se conserva.') +
+      (queda !== null
+        ? ' Este mes llevas gastados ' + usd(d.gastadoEsteMes) + ' de ' + usd(a.topeMensual) +
+          ', quedan <b>' + usd(queda) + '</b>.'
+        : ' Sin tope mensual.') +
+    '</p>'
+
+  $('#btnInterruptor').addEventListener('click', async () => {
+    const encender = !a.activo
+    if (encender && !confirm('Vas a encender el programa. Desde este momento empiezan a acumularse saldos reales. ¿Seguro?')) return
+    try {
+      await api('/api/admin/referidos/ajustes', {
+        method: 'POST', body: JSON.stringify({ activo: encender ? 1 : 0 }),
+      })
+      toast(encender ? 'Programa encendido' : 'Programa apagado')
+      cargarReferidos()
+    } catch (e) { if (!e.caducada) toast(e.message) }
+  })
+}
+
+function pintarKpisRef(d) {
+  $('#kpisRef').innerHTML =
+    kpi('Usuarios', num(d.usuarios), num(d.verificados) + ' verificados') +
+    kpi('Referidos', num(d.referidos), num(d.validados) + ' ya cuentan') +
+    kpi('Por pagar', usd(d.saldoLibre), num(d.pagosPendientes) + ' retiros pedidos', true) +
+    kpi('En cuarentena', usd(d.saldoEspera), 'aún no retirable', true) +
+    kpi('Pagado ya', usd(d.saldoPagado), 'histórico', true) +
+    kpi('Gastado este mes', usd(d.gastadoEsteMes), 'de ' + usd(d.ajustes.topeMensual), true)
+}
+
+function pintarPagos(pagos) {
+  if (!pagos.length) {
+    $('#tablaPagos').innerHTML = '<tbody><tr><td>' + vacio('Ningún retiro pendiente') + '</td></tr></tbody>'
+    return
+  }
+  $('#tablaPagos').innerHTML =
+    '<thead><tr><th>Pedido</th><th>Cuenta</th><th>Binance</th><th>Monto</th><th>Válidos</th><th></th></tr></thead><tbody>' +
+    pagos.map((p) =>
+      '<tr><td>' + hace(p.pedido_at) + '</td>' +
+      '<td>' + esc(p.cuenta) + '</td>' +
+      '<td class="mono">' + esc(p.email) + '</td>' +
+      '<td class="mono"><b>' + usd(p.monto) + '</b></td>' +
+      '<td class="mono">' + num(p.validos) + '</td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn" data-pagar="' + p.id + '" style="width:auto;padding:6px 12px;margin:0;font-size:.78rem">Pagado</button> ' +
+        '<button class="btn peligro" data-rechazar="' + p.id + '" style="width:auto;padding:6px 12px;margin:0;font-size:.78rem">Rechazar</button>' +
+      '</td></tr>').join('') + '</tbody>'
+
+  $$('#tablaPagos [data-pagar]').forEach((b) =>
+    b.addEventListener('click', () => resolverPago(b.dataset.pagar, 'pagar')))
+  $$('#tablaPagos [data-rechazar]').forEach((b) =>
+    b.addEventListener('click', () => resolverPago(b.dataset.rechazar, 'rechazar')))
+}
+
+async function resolverPago(id, accion) {
+  // Esto NO envía dinero: el pago lo hace él desde su Binance. Aquí solo se
+  // anota, y conviene que el texto no deje lugar a dudas.
+  const texto = accion === 'pagar'
+    ? '¿Ya enviaste el dinero por Binance? Esto solo lo anota; el pago lo haces tú.'
+    : '¿Rechazar este retiro? El saldo se le devuelve a su cuenta.'
+  if (!confirm(texto)) return
+
+  const nota = accion === 'rechazar' ? (prompt('Motivo (opcional):') || '') : ''
+  try {
+    await api('/api/admin/referidos/pago', {
+      method: 'POST', body: JSON.stringify({ id, accion, nota }),
+    })
+    toast(accion === 'pagar' ? 'Marcado como pagado, se le avisó por correo' : 'Rechazado, saldo devuelto')
+    cargarReferidos()
+  } catch (e) { if (!e.caducada) toast(e.message) }
+}
+
+function pintarMarcados(lista) {
+  if (!lista.length) {
+    $('#tablaMarcados').innerHTML = '<tbody><tr><td>' +
+      vacio('Nada que revisar',
+            'Aquí caen los referidos que llegaron al umbral pero olieron raro. No se pagan sin que tú lo apruebes.') +
+      '</td></tr></tbody>'
+    return
+  }
+  $('#tablaMarcados').innerHTML =
+    '<thead><tr><th>Cuándo</th><th>De quién</th><th>Motivo</th><th>Días</th><th>IP</th><th></th></tr></thead><tbody>' +
+    lista.map((m) =>
+      '<tr><td>' + hace(m.creado) + '</td>' +
+      '<td>' + esc(m.email) + '<br><span style="color:var(--muted);font-size:.74rem">' + esc(m.codigo) + '</span></td>' +
+      '<td><span class="etq mal">' + esc(m.motivo) + '</span></td>' +
+      '<td class="mono">' + num(m.dias) + '</td>' +
+      '<td class="mono">' + bandera(m.pais) + ' ' + esc(m.ip || '—') + '</td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn" data-aprobar="' + esc(m.visitorId) + '" style="width:auto;padding:6px 12px;margin:0;font-size:.78rem">Aprobar</button> ' +
+        '<button class="btn peligro" data-descartar="' + esc(m.visitorId) + '" style="width:auto;padding:6px 12px;margin:0;font-size:.78rem">Descartar</button>' +
+      '</td></tr>').join('') + '</tbody>'
+
+  $$('#tablaMarcados [data-aprobar]').forEach((b) =>
+    b.addEventListener('click', () => resolverMarcado(b.dataset.aprobar, 'aprobar')))
+  $$('#tablaMarcados [data-descartar]').forEach((b) =>
+    b.addEventListener('click', () => resolverMarcado(b.dataset.descartar, 'descartar')))
+}
+
+async function resolverMarcado(visitorId, accion) {
+  const recompensa = estado.ref?.ajustes?.recompensa ?? 0
+  if (accion === 'aprobar' &&
+      !confirm('¿Aprobar este referido y abonar ' + usd(recompensa) + ' a quien lo trajo?')) return
+  if (accion === 'descartar' &&
+      !confirm('¿Descartar este referido? No se paga nada y no vuelve a aparecer.')) return
+  try {
+    await api('/api/admin/referidos/marcado', {
+      method: 'POST', body: JSON.stringify({ visitorId, accion, recompensa }),
+    })
+    toast(accion === 'aprobar' ? 'Aprobado y abonado' : 'Descartado')
+    cargarReferidos()
+  } catch (e) { if (!e.caducada) toast(e.message) }
+}
+
+function pintarRefUsuarios(top) {
+  if (!top.length) {
+    $('#tablaRefUsuarios').innerHTML = '<tbody><tr><td>' + vacio('Todavía nadie se ha registrado') + '</td></tr></tbody>'
+    return
+  }
+  $('#tablaRefUsuarios').innerHTML =
+    '<thead><tr><th>Cuenta</th><th>Código</th><th>Trajo</th><th>Válidos</th><th>Cuarentena</th><th>Por cobrar</th><th>Cobrado</th><th></th></tr></thead><tbody>' +
+    top.map((u) =>
+      '<tr' + (u.bloqueado ? ' style="opacity:.5"' : '') + '>' +
+      '<td>' + esc(u.email) +
+        (u.verificado ? '' : ' <span class="etq">sin verificar</span>') +
+        (u.bloqueado ? ' <span class="etq mal">bloqueado</span>' : '') + '</td>' +
+      '<td class="mono">' + esc(u.codigo) + '</td>' +
+      '<td class="mono">' + num(u.total) + '</td>' +
+      '<td class="mono"><b>' + num(u.validos) + '</b></td>' +
+      '<td class="mono">' + usd(u.espera) + '</td>' +
+      '<td class="mono">' + usd(u.libre) + '</td>' +
+      '<td class="mono">' + usd(u.pagado) + '</td>' +
+      '<td><button class="btn ' + (u.bloqueado ? '' : 'peligro') + '" data-bloq="' + u.id + '" ' +
+        'data-estado="' + (u.bloqueado ? '1' : '0') + '" ' +
+        'style="width:auto;padding:6px 12px;margin:0;font-size:.78rem">' +
+        (u.bloqueado ? 'Desbloquear' : 'Bloquear') + '</button></td></tr>').join('') + '</tbody>'
+
+  $$('#tablaRefUsuarios [data-bloq]').forEach((b) => b.addEventListener('click', async () => {
+    const bloquear = b.dataset.estado === '0'
+    if (bloquear && !confirm('¿Bloquear esta cuenta? Deja de acumular, no puede retirar y se le cierra la sesión.')) return
+    const nota = bloquear ? (prompt('Motivo (queda anotado, uso interno):') || '') : ''
+    try {
+      await api('/api/admin/referidos/usuario', {
+        method: 'POST', body: JSON.stringify({ id: b.dataset.bloq, bloqueado: bloquear, nota }),
+      })
+      toast(bloquear ? 'Cuenta bloqueada' : 'Cuenta desbloqueada')
+      cargarReferidos()
+    } catch (e) { if (!e.caducada) toast(e.message) }
+  }))
+}
+
+function pintarUltimosRef(lista) {
+  if (!lista.length) {
+    $('#tablaUltimosRef').innerHTML = '<tbody><tr><td>' + vacio('Sin referidos todavía') + '</td></tr></tbody>'
+    return
+  }
+  $('#tablaUltimosRef').innerHTML =
+    '<thead><tr><th>Cuándo</th><th>Trajo</th><th>Días</th><th>Estado</th><th>Desde</th></tr></thead><tbody>' +
+    lista.map((r) =>
+      '<tr><td>' + hace(r.creado) + '</td>' +
+      '<td>' + esc(r.email) + '</td>' +
+      '<td class="mono">' + num(r.dias) + '</td>' +
+      '<td>' + (r.pagable ? '<span class="etq bien">retirable</span>'
+              : r.validado ? '<span class="etq">en cuarentena</span>'
+              : '<span class="etq">contando días</span>') + '</td>' +
+      '<td>' + bandera(r.pais) + ' ' + esc(r.modo || '—') + '</td></tr>').join('') + '</tbody>'
+}
+
+function rellenarAjustes(a) {
+  $('#aRecompensa').value = a.recompensa
+  $('#aMinimo').value = a.minimoRetiro
+  $('#aTope').value = a.topeMensual
+  $('#aDias').value = a.diasActivos
+  $('#aCuarentena').value = a.diasCuarentena
+  $('#aMaxIp').value = a.maxPorIp
+  $('#aTopeDia').value = a.topeDiarioPorUsuario
+}
+
+$('#formAjustes').addEventListener('submit', async (e) => {
+  e.preventDefault()
+  const av = $('#avisoAjustes')
+  av.className = 'aviso'
+  av.textContent = ''
+  const btn = e.target.querySelector('button')
+  btn.disabled = true
+  try {
+    await api('/api/admin/referidos/ajustes', {
+      method: 'POST',
+      body: JSON.stringify({
+        recompensa: $('#aRecompensa').value,
+        minimoRetiro: $('#aMinimo').value,
+        topeMensual: $('#aTope').value,
+        diasActivos: $('#aDias').value,
+        diasCuarentena: $('#aCuarentena').value,
+        maxPorIp: $('#aMaxIp').value,
+        topeDiarioPorUsuario: $('#aTopeDia').value,
+      }),
+    })
+    av.classList.add('bien')
+    av.textContent = 'Reglas guardadas. Aplican desde ya, sin reiniciar nada.'
+    toast('Reglas guardadas')
+    cargarReferidos()
+  } catch (e2) {
+    if (e2.caducada) return
+    av.classList.add('mal')
+    av.textContent = e2.message
+  } finally {
+    btn.disabled = false
+  }
+})
+
 /* ─── detalle de una persona ─── */
 
 async function abrirVisitante(clave) {
@@ -1401,7 +1727,7 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#hoja').classLis
 // segundo plano, y menos desde un teléfono con datos móviles.
 async function refrescarSuave() {
   if (document.visibilityState !== 'visible') return
-  if (estado.vista === 'cuenta') return
+  if (estado.vista === 'cuenta' || estado.vista === 'referidos') return
   try {
     const d = await api('/api/admin/stats?rango=' + estado.rango)
     estado.stats = d
@@ -1417,6 +1743,7 @@ async function cargarTodo() {
   if (estado.vista === 'visitas') await cargarVisitas()
   if (estado.vista === 'salud') await cargarSalud()
   if (estado.vista === 'cuenta') await cargarPerfil()
+  if (estado.vista === 'referidos') await cargarReferidos()
   cargarPerfil().catch(() => {})   // para el correo de la barra lateral
 }
 

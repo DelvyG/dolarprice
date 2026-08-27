@@ -797,6 +797,9 @@ function marcar(event, extra = {}) {
     w: screen.width,
     h: screen.height,
     l: navigator.language,
+    // Con quien codigo llego esta persona. El servidor decide que hacer con
+    // el; aqui solo se transporta.
+    ref: refGuardado(),
     ...extra,
   })
 
@@ -859,3 +862,413 @@ if (tabInicial && ['inicio', 'monedas', 'noticias', 'historial'].includes(tabIni
 if ('serviceWorker' in navigator) {
   addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
 }
+
+/* ═══ comparte y gana ════════════════════════════════════════════════════════
+   Programa de referidos. Toda la lógica de dinero vive en el servidor: aquí
+   solo se pinta lo que él responde y se mandan las acciones. Nada de lo que se
+   guarde en este navegador decide cuánto cobra nadie.
+
+   Se esconde entero si el programa está apagado desde /admin.              */
+
+const CLAVE_REF = 'dolarprice.ref'      // código con el que llegó este visitante
+
+const gana = { reglas: null, yo: null, vista: 'entrar' }
+
+/* ─── el código de quien lo invitó ────────────────────────────────────────────
+   Llega por ?ref=CODIGO y se guarda para siempre en este aparato. Es lo que
+   hace que la atribución sobreviva a la instalación del APK: como la app es una
+   TWA —Chrome de verdad, no un WebView— comparte localStorage con el navegador,
+   así que el código puesto al abrir el enlace sigue ahí dentro de la app. */
+;(function guardarRef() {
+  const v = new URLSearchParams(location.search).get('ref')
+  if (!v) return
+  const codigo = v.toUpperCase().slice(0, 12)
+  if (!/^[A-Z2-9]{5,12}$/.test(codigo)) return
+  // No se pisa uno anterior: el primero que trajo a esta persona es el que vale.
+  try { if (!localStorage.getItem(CLAVE_REF)) localStorage.setItem(CLAVE_REF, codigo) } catch {}
+})()
+
+const refGuardado = () => { try { return localStorage.getItem(CLAVE_REF) } catch { return null } }
+
+/* ─── llamadas ─── */
+
+async function apiGana(ruta, opciones = {}) {
+  const res = await fetch(ruta, {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    ...opciones,
+    headers: { 'Content-Type': 'application/json', ...(opciones.headers || {}) },
+  })
+  const datos = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(datos.error || 'Algo salió mal, intenta de nuevo')
+  return datos
+}
+
+const dinero = (v) => '$' + Number(v || 0).toFixed(2)
+
+/* ─── la tarjeta de Inicio ─── */
+
+async function cargarGana() {
+  try {
+    gana.reglas = await apiGana('/api/v1/ref/reglas')
+    if (!gana.reglas.activo) { $('#gana').hidden = true; return }
+
+    gana.yo = await apiGana('/api/v1/cuenta/yo')
+    $('#gana').hidden = false
+    pintarGana()
+  } catch {
+    $('#gana').hidden = true   // si falla, la app sigue como si nada
+  }
+}
+
+function pintarGana() {
+  const r = gana.reglas
+  const y = gana.yo
+
+  if (!y?.dentro) {
+    $('#gana-tit').textContent = 'Comparte y gana'
+    $('#gana-sub').textContent =
+      'Gana ' + dinero(r.recompensa) + ' por cada amigo que use la app.'
+    $('#gana-cuerpo').innerHTML =
+      '<p class="gana-pista">Cada amigo que entre con tu enlace y use DolarPrice ' +
+      '<b>' + r.diasActivos + ' días</b> te deja <b>' + dinero(r.recompensa) + '</b>. ' +
+      'Cobras por Binance a partir de ' + dinero(r.minimoRetiro) + '.</p>' +
+      '<div class="gana-acts">' +
+        '<button class="btn ghost" id="gana-entrar">Ya tengo cuenta</button>' +
+        '<button class="btn solid" id="gana-crear">Crear cuenta</button>' +
+      '</div>'
+    $('#gana-crear').addEventListener('click', () => abrirCuenta('registro'))
+    $('#gana-entrar').addEventListener('click', () => abrirCuenta('entrar'))
+    return
+  }
+
+  $('#gana-tit').textContent = 'Tus referidos'
+  $('#gana-sub').textContent = y.bloqueado
+    ? 'Tu cuenta está en revisión.'
+    : dinero(r.recompensa) + ' por cada amigo que use la app ' + r.diasActivos + ' días.'
+
+  const falta = Math.max(0, r.minimoRetiro - y.saldoLibre)
+  const pct = r.minimoRetiro > 0 ? Math.min(100, (y.saldoLibre / r.minimoRetiro) * 100) : 100
+
+  $('#gana-cuerpo').innerHTML =
+    '<div class="gana-nums">' +
+      '<div class="gana-num"><b>' + y.validos + '</b><span>válidos</span></div>' +
+      '<div class="gana-num"><b>' + dinero(y.saldoLibre) + '</b><span>por cobrar</span></div>' +
+      '<div class="gana-num"><b>' + dinero(y.saldoEspera) + '</b><span>en camino</span></div>' +
+    '</div>' +
+    '<div class="gana-codigo"><b>' + y.codigo + '</b>' +
+      '<button id="gana-copiar">Copiar</button></div>' +
+    '<div class="gana-barra"><i style="width:' + pct.toFixed(0) + '%"></i></div>' +
+    '<p class="gana-pista">' +
+      (!y.verificado
+        ? 'Confirma tu correo para poder cobrar. Te mandamos un enlace a <b>' + y.email + '</b>.'
+        : falta > 0
+          ? 'Te faltan <b>' + dinero(falta) + '</b> para poder retirar.'
+          : '¡Ya puedes retirar <b>' + dinero(y.saldoLibre) + '</b>!') +
+      (y.saldoEspera > 0
+        ? ' Lo que está "en camino" pasa a cobrable a los ' + r.diasCuarentena + ' días.'
+        : '') +
+    '</p>' +
+    '<div class="gana-acts">' +
+      '<button class="btn ghost" id="gana-detalle">Mi cuenta</button>' +
+      '<button class="btn solid" id="gana-compartir">Compartir</button>' +
+    '</div>'
+
+  $('#gana-copiar').addEventListener('click', () => copiarEnlace(y.enlace))
+  $('#gana-compartir').addEventListener('click', () => compartirEnlace(y))
+  $('#gana-detalle').addEventListener('click', () => abrirCuenta('panel'))
+}
+
+async function copiarEnlace(enlace) {
+  vibrar()
+  try {
+    await navigator.clipboard.writeText(enlace)
+    toast('Enlace copiado')
+  } catch {
+    toast('No se pudo copiar')
+  }
+}
+
+async function compartirEnlace(y) {
+  vibrar()
+  const texto = 'Mira el precio del dólar en Venezuela al instante con DolarPrice. ' +
+    'Entra con mi enlace: ' + y.enlace
+  try {
+    if (navigator.share) await navigator.share({ title: 'DolarPrice', text: texto, url: y.enlace })
+    else { await navigator.clipboard.writeText(texto); toast('Mensaje copiado') }
+  } catch { /* el usuario canceló */ }
+}
+
+/* ─── la hoja de la cuenta ─── */
+
+function abrirCuenta(vista) {
+  vibrar()
+  gana.vista = vista
+  $('#hoja-cuenta').classList.add('on')
+  pintarCuenta()
+}
+
+function cerrarCuenta() {
+  $('#hoja-cuenta').classList.remove('on')
+}
+
+const campo = (id, etiqueta, tipo, extra = '') =>
+  '<div class="campo"><label for="' + id + '">' + etiqueta + '</label>' +
+  '<input type="' + tipo + '" id="' + id + '" ' + extra + '></div>'
+
+function pintarCuenta() {
+  const c = $('#hc-cuerpo')
+  const r = gana.reglas
+  const y = gana.yo
+
+  if (gana.vista === 'registro') {
+    c.innerHTML =
+      '<h3>Crear tu cuenta</h3>' +
+      '<p class="hc-sub">Para guardar lo que ganes y poder cobrarlo. Entrar a ver el dólar no necesita cuenta.</p>' +
+      campo('r-email', 'Correo', 'email', 'autocomplete="email" required') +
+      campo('r-pass', 'Contraseña', 'password', 'autocomplete="new-password" minlength="10" required') +
+      campo('r-pass2', 'Repite la contraseña', 'password', 'autocomplete="new-password" minlength="10" required') +
+      '<button class="btn solid" id="hc-enviar" style="width:100%;margin-top:18px">Crear cuenta</button>' +
+      '<div class="gana-aviso" id="hc-aviso"></div>' +
+      '<div class="pie-links"><button class="enlace" id="hc-ir-entrar">Ya tengo cuenta</button></div>'
+    $('#hc-enviar').addEventListener('click', hacerRegistro)
+    $('#hc-ir-entrar').addEventListener('click', () => { gana.vista = 'entrar'; pintarCuenta() })
+
+  } else if (gana.vista === 'entrar') {
+    c.innerHTML =
+      '<h3>Entrar</h3>' +
+      '<p class="hc-sub">Tus ganancias te siguen: entra desde el teléfono o desde la computadora.</p>' +
+      campo('e-email', 'Correo', 'email', 'autocomplete="email" required') +
+      campo('e-pass', 'Contraseña', 'password', 'autocomplete="current-password" required') +
+      '<button class="btn solid" id="hc-enviar" style="width:100%;margin-top:18px">Entrar</button>' +
+      '<div class="gana-aviso" id="hc-aviso"></div>' +
+      '<div class="pie-links">' +
+        '<button class="enlace" id="hc-ir-registro">Crear una cuenta</button>' +
+        '<button class="enlace" id="hc-olvide">Olvidé mi contraseña</button>' +
+      '</div>'
+    $('#hc-enviar').addEventListener('click', hacerEntrar)
+    $('#hc-ir-registro').addEventListener('click', () => { gana.vista = 'registro'; pintarCuenta() })
+    $('#hc-olvide').addEventListener('click', () => { gana.vista = 'olvide'; pintarCuenta() })
+
+  } else if (gana.vista === 'olvide') {
+    c.innerHTML =
+      '<h3>Recuperar tu contraseña</h3>' +
+      '<p class="hc-sub">Te mandamos un enlace al correo con el que te registraste.</p>' +
+      campo('o-email', 'Correo', 'email', 'autocomplete="email" required') +
+      '<button class="btn solid" id="hc-enviar" style="width:100%;margin-top:18px">Mandar el enlace</button>' +
+      '<div class="gana-aviso" id="hc-aviso"></div>' +
+      '<div class="pie-links"><button class="enlace" id="hc-ir-entrar">Volver</button></div>'
+    $('#hc-enviar').addEventListener('click', hacerOlvide)
+    $('#hc-ir-entrar').addEventListener('click', () => { gana.vista = 'entrar'; pintarCuenta() })
+
+  } else if (gana.vista === 'reset') {
+    c.innerHTML =
+      '<h3>Contraseña nueva</h3>' +
+      '<p class="hc-sub">Escribe la nueva. Al guardarla se cierran las sesiones abiertas.</p>' +
+      campo('n-pass', 'Contraseña nueva', 'password', 'autocomplete="new-password" minlength="10" required') +
+      campo('n-pass2', 'Repítela', 'password', 'autocomplete="new-password" minlength="10" required') +
+      '<button class="btn solid" id="hc-enviar" style="width:100%;margin-top:18px">Guardar</button>' +
+      '<div class="gana-aviso" id="hc-aviso"></div>'
+    $('#hc-enviar').addEventListener('click', hacerReset)
+
+  } else if (gana.vista === 'retiro') {
+    c.innerHTML =
+      '<h3>Retirar ' + dinero(y.saldoLibre) + '</h3>' +
+      '<p class="hc-sub">Te lo mandamos por Binance. Escribe el correo de tu cuenta de Binance, ' +
+      'revisa bien que esté correcto.</p>' +
+      campo('w-email', 'Correo de tu Binance', 'email',
+            'autocomplete="email" value="' + (y.binanceEmail || y.email || '') + '" required') +
+      '<button class="btn solid" id="hc-enviar" style="width:100%;margin-top:18px">Pedir el retiro</button>' +
+      '<div class="gana-aviso" id="hc-aviso"></div>' +
+      '<p class="gana-pista">Los pagos se revisan a mano, así que pueden tardar unos días.</p>' +
+      '<div class="pie-links"><button class="enlace" id="hc-ir-panel">Volver</button></div>'
+    $('#hc-enviar').addEventListener('click', hacerRetiro)
+    $('#hc-ir-panel').addEventListener('click', () => { gana.vista = 'panel'; pintarCuenta() })
+
+  } else {
+    // panel del usuario
+    const puede = y.verificado && y.saldoLibre >= r.minimoRetiro && !y.bloqueado
+    c.innerHTML =
+      '<h3>Mi cuenta</h3>' +
+      '<p class="hc-sub">' + y.email +
+        (y.verificado ? '' : ' · <b style="color:var(--danger)">sin confirmar</b>') + '</p>' +
+      '<div class="gana-nums">' +
+        '<div class="gana-num"><b>' + y.total + '</b><span>invitados</span></div>' +
+        '<div class="gana-num"><b>' + y.validos + '</b><span>válidos</span></div>' +
+        '<div class="gana-num"><b>' + dinero(y.saldoPagado) + '</b><span>cobrado</span></div>' +
+      '</div>' +
+      '<div class="gana-codigo"><b>' + y.codigo + '</b><button id="hc-copiar">Copiar</button></div>' +
+      (y.verificado ? '' :
+        '<button class="btn ghost" id="hc-reenviar" style="width:100%;margin-top:12px">Reenviar el correo de confirmación</button>') +
+      '<button class="btn solid" id="hc-retirar" style="width:100%;margin-top:12px"' +
+        (puede ? '' : ' disabled') + '>' +
+        (puede ? 'Retirar ' + dinero(y.saldoLibre)
+               : !y.verificado ? 'Confirma tu correo para cobrar'
+               : 'Mínimo ' + dinero(r.minimoRetiro) + ' para cobrar') +
+      '</button>' +
+      '<div class="gana-aviso" id="hc-aviso"></div>' +
+      (y.referidos.length
+        ? '<p class="gana-pista" style="margin-top:18px"><b>Tus invitados</b></p>' +
+          y.referidos.slice(0, 12).map((x) =>
+            '<p class="gana-pista" style="margin-top:6px">' +
+            (x.pagable ? '✅ ' : x.validado ? '⏳ ' : '👀 ') +
+            (x.validado ? (x.pagable ? 'Listo, ya cuenta' : 'Contando cuarentena')
+                        : 'Lleva ' + x.dias + ' de ' + r.diasActivos + ' días') + '</p>').join('')
+        : '<p class="gana-pista" style="margin-top:18px">Todavía no ha entrado nadie con tu enlace.</p>') +
+      (y.retiros.length
+        ? '<p class="gana-pista" style="margin-top:18px"><b>Tus retiros</b></p>' +
+          y.retiros.map((x) =>
+            '<p class="gana-pista" style="margin-top:6px">' + dinero(x.monto) + ' · ' +
+            (x.estado === 'pagado' ? '✅ pagado' : x.estado === 'rechazado' ? '❌ rechazado' : '⏳ en revisión') +
+            '</p>').join('')
+        : '') +
+      '<div class="pie-links"><button class="enlace" id="hc-salir">Cerrar sesión</button></div>'
+
+    $('#hc-copiar').addEventListener('click', () => copiarEnlace(y.enlace))
+    $('#hc-salir').addEventListener('click', hacerSalir)
+    if (puede) $('#hc-retirar').addEventListener('click', () => { gana.vista = 'retiro'; pintarCuenta() })
+    $('#hc-reenviar')?.addEventListener('click', hacerReenviar)
+  }
+}
+
+/* ─── acciones ─── */
+
+function avisar(texto, bien) {
+  const el = $('#hc-aviso')
+  if (!el) return
+  el.className = 'gana-aviso ' + (bien ? 'bien' : 'mal')
+  el.textContent = texto
+  if (!bien) vibrar(40)
+}
+
+async function conBoton(fn) {
+  const b = $('#hc-enviar')
+  const antes = b?.textContent
+  if (b) { b.disabled = true; b.textContent = 'Un momento…' }
+  try { await fn() } finally { if (b) { b.disabled = false; b.textContent = antes } }
+}
+
+const hacerRegistro = () => conBoton(async () => {
+  try {
+    const d = await apiGana('/api/v1/cuenta/registro', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: $('#r-email').value.trim(),
+        pass: $('#r-pass').value,
+        confirmar: $('#r-pass2').value,
+        v: YO.vid,
+      }),
+    })
+    gana.yo = await apiGana('/api/v1/cuenta/yo')
+    pintarGana()
+    gana.vista = 'panel'
+    pintarCuenta()
+    toast(d.correoEnviado ? 'Cuenta creada, revisa tu correo' : 'Cuenta creada')
+  } catch (e) { avisar(e.message) }
+})
+
+const hacerEntrar = () => conBoton(async () => {
+  try {
+    await apiGana('/api/v1/cuenta/entrar', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: $('#e-email').value.trim(),
+        pass: $('#e-pass').value,
+        v: YO.vid,
+      }),
+    })
+    gana.yo = await apiGana('/api/v1/cuenta/yo')
+    pintarGana()
+    gana.vista = 'panel'
+    pintarCuenta()
+    toast('¡Hola de nuevo!')
+  } catch (e) { avisar(e.message) }
+})
+
+const hacerOlvide = () => conBoton(async () => {
+  try {
+    await apiGana('/api/v1/cuenta/olvide', {
+      method: 'POST', body: JSON.stringify({ email: $('#o-email').value.trim() }),
+    })
+    // Siempre el mismo mensaje, exista o no la cuenta: si no, este formulario
+    // serviría para averiguar qué correos están registrados.
+    avisar('Si ese correo tiene cuenta, ya salió el enlace. Revisa tu bandeja.', true)
+  } catch (e) { avisar(e.message) }
+})
+
+const hacerReset = () => conBoton(async () => {
+  try {
+    await apiGana('/api/v1/cuenta/reset', {
+      method: 'POST',
+      body: JSON.stringify({
+        token: gana.tokenReset,
+        nueva: $('#n-pass').value,
+        confirmar: $('#n-pass2').value,
+      }),
+    })
+    avisar('Contraseña cambiada. Ya puedes entrar.', true)
+    setTimeout(() => { gana.vista = 'entrar'; pintarCuenta() }, 1400)
+  } catch (e) { avisar(e.message) }
+})
+
+const hacerRetiro = () => conBoton(async () => {
+  try {
+    const d = await apiGana('/api/v1/ref/retiro', {
+      method: 'POST', body: JSON.stringify({ email: $('#w-email').value.trim() }),
+    })
+    gana.yo = await apiGana('/api/v1/cuenta/yo')
+    pintarGana()
+    gana.vista = 'panel'
+    pintarCuenta()
+    toast('Retiro de ' + dinero(d.monto) + ' pedido')
+  } catch (e) { avisar(e.message) }
+})
+
+async function hacerReenviar() {
+  try {
+    await apiGana('/api/v1/cuenta/reenviar', { method: 'POST' })
+    avisar('Correo reenviado, revisa tu bandeja.', true)
+  } catch (e) { avisar(e.message) }
+}
+
+async function hacerSalir() {
+  try { await apiGana('/api/v1/cuenta/salir', { method: 'POST' }) } catch {}
+  gana.yo = { dentro: false }
+  pintarGana()
+  cerrarCuenta()
+  toast('Sesión cerrada')
+}
+
+/* ─── enlaces que llegan por correo ───────────────────────────────────────────
+   Apuntan a /cuenta?verificar=... y /cuenta?reset=... . Se procesan aquí y se
+   limpia la URL después, para que el token no se quede en la barra ni acabe en
+   el historial ni en un enlace compartido. */
+;(async function enlacesDeCorreo() {
+  const q = new URLSearchParams(location.search)
+  const verificar = q.get('verificar')
+  const reset = q.get('reset')
+  if (!verificar && !reset) return
+
+  history.replaceState(null, '', location.pathname === '/cuenta' ? '/' : location.pathname)
+
+  if (verificar) {
+    try {
+      await apiGana('/api/v1/cuenta/verificar', { method: 'POST', body: JSON.stringify({ token: verificar }) })
+      toast('¡Correo confirmado!')
+      gana.yo = await apiGana('/api/v1/cuenta/yo').catch(() => null)
+      pintarGana()
+    } catch (e) { toast(e.message) }
+    return
+  }
+
+  gana.tokenReset = reset
+  gana.reglas = gana.reglas || await apiGana('/api/v1/ref/reglas').catch(() => null)
+  abrirCuenta('reset')
+})()
+
+$('#hoja-cuenta').addEventListener('click', (e) => {
+  if (e.target === $('#hoja-cuenta')) cerrarCuenta()
+})
+addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarCuenta() })
+
+cargarGana()

@@ -19,6 +19,9 @@ import { correoAdmin, origenHash, hashAdmin } from '../admin/ajustes.js'
 import { ipDe, purgar } from '../analytics/track.js'
 import { estadisticas, ultimasVisitas, detalleVisitante, topIps, RANGOS } from '../analytics/queries.js'
 import { hayBaseGeo } from '../analytics/geo.js'
+import { resumenReferidos, listaPagos, resolverPago, bloquearUsuario, resolverMarcado } from '../referidos/panel.js'
+import { ajustesReferidos, guardarAjustes } from '../referidos/ajustes.js'
+import { proveedorCorreo } from '../correo.js'
 
 const PAGINA = join(ROOT, 'public', 'admin.html')
 
@@ -170,6 +173,54 @@ export default async function adminRoutes(app) {
     privado.post('/api/admin/sesiones/cerrar-todas', async (req, reply) => {
       await cerrarTodas()
       return reply.code(200).send({ ok: true })
+    })
+
+    /* ─── referidos ─── */
+
+    privado.get('/api/admin/referidos', async () => ({
+      ...(await resumenReferidos()),
+      ajustes: await ajustesReferidos(),
+      correo: proveedorCorreo(),
+    }))
+
+    privado.get('/api/admin/referidos/pagos', async (req) => ({
+      pagos: await listaPagos(req.query?.estado),
+    }))
+
+    privado.post('/api/admin/referidos/pago', async (req, reply) => {
+      const r = await resolverPago({
+        id: Math.trunc(Number(req.body?.id)) || 0,
+        accion: req.body?.accion,
+        nota: req.body?.nota,
+      }, app.log)
+      if (!r.ok) return reply.code(400).send({ error: r.error })
+      return r
+    })
+
+    privado.post('/api/admin/referidos/ajustes', async (req, reply) => {
+      const r = await guardarAjustes(req.body || {})
+      if (!r.ok) return reply.code(400).send({ error: r.error })
+      return { ok: true, ajustes: await ajustesReferidos() }
+    })
+
+    privado.post('/api/admin/referidos/usuario', async (req, reply) => {
+      const r = await bloquearUsuario({
+        id: Math.trunc(Number(req.body?.id)) || 0,
+        bloqueado: Boolean(req.body?.bloqueado),
+        nota: req.body?.nota,
+      })
+      if (!r.ok) return reply.code(400).send({ error: r.error })
+      return { ok: true }
+    })
+
+    privado.post('/api/admin/referidos/marcado', async (req, reply) => {
+      const r = await resolverMarcado({
+        visitorId: req.body?.visitorId,
+        accion: req.body?.accion,
+        recompensa: req.body?.recompensa,
+      })
+      if (!r.ok) return reply.code(400).send({ error: r.error })
+      return r
     })
 
     privado.post('/api/admin/purgar', async (req) => {

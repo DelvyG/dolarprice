@@ -541,3 +541,151 @@ main.sheet-abierto { padding-bottom: 58vh; }
 @media (min-width: 480px) {
   .key { padding: 17px 0; }
 }
+
+/* ═══ Comparte y gana ═══════════════════════════════════════════════════════
+   Va dentro de Inicio, debajo del conversor. No es una pestaña propia: cinco
+   iconos en la barra de abajo se aprietan demasiado en pantallas pequeñas, y
+   además esto solo interesa a quien quiere ganar dinero, no a quien entra a
+   mirar el dólar y se va. */
+
+.gana {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px;
+  overflow: hidden;
+}
+
+.gana-top { display: flex; align-items: center; gap: 12px; }
+
+.gana-ico {
+  width: 40px; height: 40px; flex: none;
+  border-radius: 13px;
+  background: linear-gradient(140deg, var(--brand), var(--teal));
+  display: grid; place-items: center;
+  font-size: 1.2rem;
+}
+
+.gana-txt { min-width: 0; }
+.gana-txt strong { display: block; font-size: .95rem; letter-spacing: -.01em; }
+.gana-txt span { display: block; font-size: .8rem; color: var(--muted); line-height: 1.4; }
+
+.gana-acts { display: flex; gap: 8px; margin-top: 14px; }
+.gana-acts .btn { flex: 1; }
+
+/* Cifras del usuario */
+.gana-nums {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; margin-top: 14px;
+}
+.gana-num {
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  padding: 10px 8px;
+  text-align: center;
+}
+.gana-num b {
+  display: block; font-size: 1.15rem; letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+.gana-num span { display: block; font-size: .68rem; color: var(--muted); margin-top: 1px; }
+
+/* El código, grande y fácil de leer en voz alta */
+.gana-codigo {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 14px;
+  background: var(--surface-2);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+}
+.gana-codigo b {
+  flex: 1; min-width: 0;
+  font-size: 1.15rem; font-weight: 700;
+  letter-spacing: .12em;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.gana-codigo button {
+  flex: none; border: none; background: none; color: var(--brand-2);
+  font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer;
+  padding: 4px 6px;
+}
+
+.gana-pista { font-size: .76rem; color: var(--muted); line-height: 1.55; margin: 12px 0 0; }
+.gana-pista b { color: var(--text); font-weight: 600; }
+
+.gana-barra {
+  height: 6px; border-radius: 999px; background: var(--surface-2);
+  overflow: hidden; margin-top: 10px;
+}
+.gana-barra i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--brand), var(--brand-2));
+  transition: width .5s var(--ease);
+}
+
+.gana-aviso { font-size: .78rem; margin-top: 10px; line-height: 1.45; min-height: 1.1em; }
+.gana-aviso.mal { color: var(--danger); }
+.gana-aviso.bien { color: var(--brand-2); }
+
+/* ─── hoja de la cuenta ─── */
+
+#hoja-cuenta {
+  position: fixed; inset: 0; z-index: 70;
+  display: none;
+  background: rgba(0,0,0,.6);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+#hoja-cuenta.on { display: block; }
+
+#hoja-cuenta .hc {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  max-height: 92dvh; overflow-y: auto;
+  background: var(--bg-2);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  border-top: 1px solid var(--line-2);
+  padding: 10px 18px calc(24px + var(--safe-b));
+  animation: hc-subir .3s var(--ease);
+}
+@keyframes hc-subir { from { transform: translateY(100%) } to { transform: none } }
+
+@media (min-width: 700px) {
+  #hoja-cuenta .hc {
+    left: 50%; top: 50%; right: auto; bottom: auto;
+    transform: translate(-50%, -50%);
+    width: min(460px, 92vw);
+    border-radius: var(--r-lg); border: 1px solid var(--line-2);
+    animation: none;
+  }
+  #hoja-cuenta .hc-agarre { display: none; }
+}
+
+.hc-agarre { width: 38px; height: 4px; border-radius: 999px; background: var(--line-2); margin: 0 auto 16px; }
+.hc h3 { margin: 0 0 4px; font-size: 1.05rem; letter-spacing: -.02em; }
+.hc .hc-sub { margin: 0 0 18px; font-size: .84rem; color: var(--muted); line-height: 1.5; }
+
+.hc label { display: block; font-size: .76rem; font-weight: 600; color: var(--muted); margin: 0 0 5px; }
+.hc .campo + .campo { margin-top: 12px; }
+
+.hc input {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  padding: 12px 13px;
+  font: inherit;
+  outline: none;
+  transition: border-color .16s;
+}
+.hc input:focus { border-color: var(--brand); }
+
+.hc .enlace {
+  background: none; border: none; color: var(--brand-2);
+  font: inherit; font-size: .82rem; cursor: pointer; padding: 4px 0;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.hc .pie-links { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; flex-wrap: wrap; }

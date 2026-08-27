@@ -17,7 +17,7 @@
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
-<link rel="stylesheet" href="/styles.css?v=9">
+<link rel="stylesheet" href="/styles.css?v=10">
 <meta property="og:title" content="DolarPrice · Dólar BCV y paralelo">
 <meta property="og:description" content="Precio del dólar BCV y del paralelo Binance P2P en Venezuela.">
 <meta property="og:type" content="website">
@@ -113,6 +113,21 @@
       </div>
     </section>
 
+    <!-- Comparte y gana. Va aquí, junto al botón de compartir que ya existía, y
+         no como quinta pestaña: la barra de abajo con cinco iconos se aprieta
+         demasiado en pantallas pequeñas. Se oculta entera si el programa está
+         apagado desde /admin. -->
+    <section class="gana" id="gana" hidden>
+      <div class="gana-top">
+        <div class="gana-ico">🎁</div>
+        <div class="gana-txt">
+          <strong id="gana-tit">Comparte y gana</strong>
+          <span id="gana-sub">Invita amigos y gana dinero real.</span>
+        </div>
+      </div>
+      <div id="gana-cuerpo"></div>
+    </section>
+
     <p class="stamp" id="stamp">Cargando…</p>
   </section>
 
@@ -184,6 +199,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/app.js?v=12" type="module"></script>
+<div id="hoja-cuenta"><div class="hc"><div class="hc-agarre"></div><div id="hc-cuerpo"></div></div></div>
+
+<script src="/app.js?v=13" type="module"></script>
 </body>
 </html>
