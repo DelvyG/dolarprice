@@ -19,7 +19,13 @@
 
 import { config } from './config.js'
 
-const DE = process.env.CORREO_DESDE || 'DolarPrice <no-responder@dolarprice.com>'
+const DE = process.env.CORREO_DESDE || 'DolarPrice <noreply@dolarprice.com>'
+
+// A donde van las respuestas. El remitente es un noreply --lo normal y lo que
+// espera la gente-- pero aqui se mueve dinero: si alguien contesta porque su
+// pago no llego, ese correo no puede caer en un buzon que nadie lee. Con
+// Reply-To sale del noreply y aterriza en una direccion de verdad.
+const RESPONDER_A = process.env.CORREO_RESPONDER_A || ''
 
 export const hayCorreo = () =>
   Boolean(process.env.RESEND_API_KEY || process.env.BREVO_API_KEY || process.env.SMTP_HOST)
@@ -44,7 +50,10 @@ async function porResend({ para, asunto, html, texto }) {
       Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: DE, to: [para], subject: asunto, html, text: texto }),
+    body: JSON.stringify({
+      from: DE, to: [para], subject: asunto, html, text: texto,
+      ...(RESPONDER_A ? { reply_to: [RESPONDER_A] } : {}),
+    }),
   })
   if (!res.ok) throw new Error(`Resend respondio ${res.status}: ${(await res.text()).slice(0, 200)}`)
 }
@@ -61,6 +70,7 @@ async function porBrevo({ para, asunto, html, texto }) {
       subject: asunto,
       htmlContent: html,
       textContent: texto,
+      ...(RESPONDER_A ? { replyTo: { email: RESPONDER_A } } : {}),
     }),
   })
   if (!res.ok) throw new Error(`Brevo respondio ${res.status}: ${(await res.text()).slice(0, 200)}`)
@@ -81,7 +91,10 @@ async function porSmtp({ para, asunto, html, texto }) {
         : undefined,
     })
   }
-  await transporte.sendMail({ from: DE, to: para, subject: asunto, html, text: texto })
+  await transporte.sendMail({
+    from: DE, to: para, subject: asunto, html, text: texto,
+    ...(RESPONDER_A ? { replyTo: RESPONDER_A } : {}),
+  })
 }
 
 /**
