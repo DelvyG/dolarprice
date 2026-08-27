@@ -50,7 +50,13 @@ export async function valor(clave, defecto = null) {
 }
 
 export async function numero(clave, defecto) {
-  const n = Number(await valor(clave, null))
+  const crudo = await valor(clave, null)
+  // Ojo con el orden: Number(null) es 0, y 0 es finito. Comprobar solo
+  // Number.isFinite() haria que una clave que NO existe devolviera 0 en vez del
+  // valor por defecto -- que en el programa de referidos significaba pagar cero
+  // a todo el mundo y un minimo de retiro de cero.
+  if (crudo === null || crudo === undefined || crudo === '') return defecto
+  const n = Number(crudo)
   return Number.isFinite(n) ? n : defecto
 }
 

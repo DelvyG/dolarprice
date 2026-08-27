@@ -57,14 +57,25 @@ sudo -u dolarprice node scripts/migrate.js
 
 echo "==> Reiniciando servicio"
 systemctl restart dolarprice
-sleep 2
 
+# Se espera a que responda en vez de dormir un rato fijo. Con `sleep 2` el
+# despliegue salia en rojo aunque todo estuviera bien: el servicio tarda unos
+# 4-5 segundos en levantar porque carga en memoria los 124 MB de la base de
+# geolocalizacion, y la comprobacion llegaba antes de que escuchara.
 echo "==> Comprobacion"
-CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 http://127.0.0.1:3200/api/v1/health)
+CODIGO=000
+for intento in $(seq 1 20); do
+  CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://127.0.0.1:3200/api/v1/health || echo 000)
+  [ "$CODIGO" = "200" ] && break
+  sleep 1
+done
+
 if [ "$CODIGO" != "200" ]; then
-  echo "FALLO: la API responde $CODIGO" >&2
+  echo "FALLO: la API responde $CODIGO despues de 20s" >&2
   systemctl status dolarprice --no-pager | tail -20
+  journalctl -u dolarprice -n 30 --no-pager >&2
   exit 1
 fi
+echo "    respondio 200 al intento $intento"
 
 echo "==> Listo. API 200."
