@@ -25,6 +25,7 @@ async function cargar() {
   }
   const enBase = Object.fromEntries(filas.map((f) => [f.clave, f.valor]))
   cache = {
+    crudo: enBase,
     email: (enBase.email || process.env.ADMIN_EMAIL || CORREO_POR_DEFECTO).toLowerCase(),
     hash: enBase.pass_hash || config.admin.hash || '',
     // De donde salio cada cosa. El panel lo muestra para que se vea si la clave
@@ -37,6 +38,23 @@ async function cargar() {
 export const correoAdmin = async () => (await cargar()).email
 export const hashAdmin = async () => (await cargar()).hash
 export const origenHash = async () => (await cargar()).origenHash
+
+/**
+ * Lector generico de la misma tabla. Lo usan los ajustes del programa de
+ * referidos, que se editan desde el panel para no tener que desplegar cada vez
+ * que se cambia el monto que se paga.
+ */
+export async function valor(clave, defecto = null) {
+  const v = (await cargar()).crudo[clave]
+  return v === undefined ? defecto : v
+}
+
+export async function numero(clave, defecto) {
+  const n = Number(await valor(clave, null))
+  return Number.isFinite(n) ? n : defecto
+}
+
+export const guardarValor = (clave, v) => guardar(clave, String(v))
 
 async function guardar(clave, valor) {
   await query(
@@ -53,18 +71,3 @@ export const guardarCorreo = (email) => guardar('email', String(email).trim().to
 /** Comprobacion deliberadamente laxa: aqui no se manda correo, solo se compara. */
 export const correoValido = (v) =>
   typeof v === 'string' && v.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim())
-
-/**
- * Reglas de la contrasena nueva. Diez caracteres y que no sea la de ahora.
- * No se exige mayuscula-numero-simbolo a proposito: obliga a claves cortas y
- * retorcidas que acaban en un papel, y aqui el freno de verdad es el bloqueo
- * por intentos y el coste de scrypt.
- */
-export function revisarClave(nueva, confirmar) {
-  if (typeof nueva !== 'string' || nueva.length < 10) {
-    return 'La contrasena nueva debe tener al menos 10 caracteres'
-  }
-  if (nueva.length > 200) return 'Demasiado larga'
-  if (nueva !== confirmar) return 'La confirmacion no coincide'
-  return null
-}

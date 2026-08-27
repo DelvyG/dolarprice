@@ -190,3 +190,141 @@ CREATE TABLE IF NOT EXISTS `admin_config` (
   `actualizado` DATETIME     NOT NULL,
   PRIMARY KEY (`clave`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Programa de referidos. Ver "Referidos" en CLAUDE.md.
+--
+-- ── Dos reglas que explican todo el diseno ──────────────────────────────────
+--
+-- 1. Un referido NO cuenta por instalar, sino por usar la app N dias DISTINTOS
+--    (3 por defecto). Aqui sale dinero real, y pagar por instalacion se farmea:
+--    levantar mil instalaciones falsas es barato, mantenerlas abriendo la app
+--    tres dias distintos no lo es. Ademas el saldo pasa una cuarentena antes de
+--    poder retirarse, que es la ventana para cazar el fraude antes de pagarlo.
+--
+-- 2. La cuenta es de la PERSONA, no del aparato. La primera version ato el
+--    saldo al visitor_id del navegador y eso se cae solo: quien cambiara de
+--    telefono o quisiera mirar sus ganancias desde la PC perderia el dinero.
+--    De ahi `ref_users` (la cuenta) y `ref_devices` (los aparatos enlazados).
+--
+-- Para tener codigo hay que registrarse. Quien solo entra a ver el dolar sigue
+-- siendo anonimo, como hasta ahora: la analitica no cambia.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS `ref_users` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `email`         VARCHAR(160) NOT NULL,
+  `pass_hash`     VARCHAR(255) NOT NULL,          -- scrypt, mismo formato que el panel
+  `verificado`    TINYINT(1)   NOT NULL DEFAULT 0,
+  `code`          VARCHAR(12)  NOT NULL,          -- su codigo de referido
+  `binance_email` VARCHAR(160) NULL,              -- a donde se le paga; se pide al retirar
+  `saldo_espera`  DECIMAL(12,4) NOT NULL DEFAULT 0,  -- ganado, en cuarentena
+  `saldo_libre`   DECIMAL(12,4) NOT NULL DEFAULT 0,  -- ya retirable
+  `saldo_pagado`  DECIMAL(12,4) NOT NULL DEFAULT 0,  -- historico cobrado
+  `total`         INT UNSIGNED NOT NULL DEFAULT 0,   -- gente que llego con su codigo
+  `validos`       INT UNSIGNED NOT NULL DEFAULT 0,   -- de esos, los que ya cuentan
+  `bloqueado`     TINYINT(1)   NOT NULL DEFAULT 0,   -- lo marca el panel ante fraude
+  `nota`          VARCHAR(300) NULL,                  -- por que; uso interno
+  `creado`        DATETIME     NOT NULL,
+  `ultimo_acceso` DATETIME     NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_email` (`email`),
+  UNIQUE KEY `uk_code` (`code`),
+  KEY `idx_libre` (`saldo_libre`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Aparatos enlazados a una cuenta. Es lo que permite que el mismo usuario mire
+-- su saldo desde el telefono y desde la PC, y lo que conecta al referidor con
+-- las visitas anonimas que ya se registraban.
+CREATE TABLE IF NOT EXISTS `ref_devices` (
+  `visitor_id` CHAR(32)     NOT NULL,
+  `user_id`    BIGINT UNSIGNED NOT NULL,
+  `enlazado`   DATETIME     NOT NULL,
+  PRIMARY KEY (`visitor_id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Sesiones de usuario. En tabla, no en un JWT, por lo mismo que las del panel:
+-- para poder cerrarlas de verdad. En la base solo vive el sha256 del token.
+CREATE TABLE IF NOT EXISTS `ref_sessions` (
+  `token_hash` CHAR(64)     NOT NULL,
+  `user_id`    BIGINT UNSIGNED NOT NULL,
+  `creada`     DATETIME     NOT NULL,
+  `ultima`     DATETIME     NOT NULL,
+  `expira`     DATETIME     NOT NULL,
+  `ip`         VARCHAR(45)  NULL,
+  `user_agent` VARCHAR(300) NULL,
+  PRIMARY KEY (`token_hash`),
+  KEY `idx_user` (`user_id`),
+  KEY `idx_expira` (`expira`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Enlaces de un solo uso que se mandan por correo: verificar la cuenta y
+-- restablecer la contrasena. Igual que las sesiones, solo se guarda el hash.
+CREATE TABLE IF NOT EXISTS `ref_tokens` (
+  `token_hash` CHAR(64)     NOT NULL,
+  `user_id`    BIGINT UNSIGNED NOT NULL,
+  `tipo`       VARCHAR(12)  NOT NULL,           -- verificar | reset
+  `expira`     DATETIME     NOT NULL,
+  `usado`      TINYINT(1)   NOT NULL DEFAULT 0,
+  `creado`     DATETIME     NOT NULL,
+  PRIMARY KEY (`token_hash`),
+  KEY `idx_user_tipo` (`user_id`, `tipo`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Intentos de entrada de los usuarios, para el bloqueo por fuerza bruta.
+-- Aparte de admin_logins porque son cosas distintas y conviene poder mirar una
+-- sin que la otra la ensucie.
+CREATE TABLE IF NOT EXISTS `ref_logins` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `ip`         VARCHAR(45)  NOT NULL,
+  `email`      VARCHAR(160) NULL,
+  `ok`         TINYINT(1)   NOT NULL,
+  `intento_at` DATETIME     NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_ip_fecha` (`ip`, `intento_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Una fila por persona referida. La PK es el aparato: un aparato se refiere una
+-- sola vez en la vida, aunque le lleguen diez enlaces distintos.
+CREATE TABLE IF NOT EXISTS `referrals` (
+  `visitor_id`   CHAR(32)     NOT NULL,          -- el referido, sigue siendo anonimo
+  `code`         VARCHAR(12)  NOT NULL,
+  `user_id`      BIGINT UNSIGNED NOT NULL,       -- quien lo trajo
+  `ip`           VARCHAR(45)  NULL,
+  `country_code` CHAR(2)      NULL,
+  `modo`         VARCHAR(12)  NULL,              -- navegador | pwa | apk
+  `dias_activos` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `ultimo_dia`   DATE         NULL,              -- impide sumar dos veces el mismo dia
+  `validado`     TINYINT(1)   NOT NULL DEFAULT 0,
+  `validado_at`  DATETIME     NULL,
+  `madurado`     TINYINT(1)   NOT NULL DEFAULT 0,  -- salio de cuarentena, ya es retirable
+  `sospechoso`   VARCHAR(60)  NULL,              -- motivo; si no es NULL no se paga solo
+  `recompensa`   DECIMAL(12,4) NOT NULL DEFAULT 0,
+  `user_agent`   VARCHAR(400) NULL,
+  `creado`       DATETIME     NOT NULL,
+  PRIMARY KEY (`visitor_id`),
+  KEY `idx_user` (`user_id`, `validado`),
+  KEY `idx_code` (`code`),
+  KEY `idx_ip` (`ip`),
+  KEY `idx_madurar` (`validado`, `madurado`, `validado_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Solicitudes de retiro. Se pagan a mano desde el panel: automatizarlo exigiria
+-- claves de Binance CON permiso de retiro en un VPS compartido con sitios de
+-- clientes, y si esa maquina se compromete se van los fondos.
+CREATE TABLE IF NOT EXISTS `payouts` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id`     BIGINT UNSIGNED NOT NULL,
+  `code`        VARCHAR(12)  NOT NULL,
+  `email`       VARCHAR(160) NOT NULL,           -- cuenta de Binance del usuario
+  `monto`       DECIMAL(12,4) NOT NULL,
+  `estado`      VARCHAR(12)  NOT NULL DEFAULT 'pendiente',  -- pendiente|pagado|rechazado
+  `nota`        VARCHAR(300) NULL,
+  `ip`          VARCHAR(45)  NULL,
+  `pedido_at`   DATETIME     NOT NULL,
+  `resuelto_at` DATETIME     NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_estado` (`estado`, `pedido_at`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

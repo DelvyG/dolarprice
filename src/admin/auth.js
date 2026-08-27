@@ -16,67 +16,24 @@
 //
 // Sin dependencias: node:crypto trae todo esto de serie.
 
-import { createHmac, randomBytes, scrypt as scryptCb, createHash, timingSafeEqual } from 'node:crypto'
-import { promisify } from 'node:util'
+import { createHmac, randomBytes, createHash } from 'node:crypto'
+import { hashear, verificarPass, igualSeguro as igual, revisarClave } from '../clave.js'
 import { query, ahora } from '../db.js'
 import { config } from '../config.js'
-import { correoAdmin, hashAdmin, guardarHash, guardarCorreo, correoValido, revisarClave } from './ajustes.js'
+import { correoAdmin, hashAdmin, guardarHash, guardarCorreo, correoValido } from './ajustes.js'
 
-const scrypt = promisify(scryptCb)
+// hashear() y verificarPass() viven ahora en src/clave.js, compartidos con las
+// cuentas de usuario del programa de referidos: una sola implementacion, para
+// que endurecer el coste beneficie a las dos y no quede una version floja.
+// Se reexportan porque scripts/admin-pass.js los importa desde aqui.
+export { hashear, verificarPass }
 
 const COOKIE = 'dp_admin'
 const DIAS_SESION = 7
 const MAX_FALLOS = 6
 const VENTANA_MIN = 15
 
-// N=32768 son unos 32 MB y ~60 ms por intento: imperceptible al entrar, y a un
-// atacante que se hubiera llevado el .env le deja unos 15 intentos por segundo
-// y por nucleo en vez de millones. Se probo con 16384 y salia en 27 ms, que ya
-// es poco freno para el hardware de hoy.
-//
-// maxmem hay que darlo explicitamente: el tope por defecto de Node son 32 MB
-// justos y con N=32768 se pasa por poco, asi que scrypt lanzaria. El limite se
-// aplica tambien al verificar, que lee la N guardada en el propio hash.
-const SCRYPT = { N: 32768, r: 8, p: 1, len: 64 }
-const MAXMEM = 128 * 1024 * 1024
-
 const sha256 = (s) => createHash('sha256').update(s).digest('hex')
-
-const igual = (a, b) => {
-  const x = Buffer.from(String(a))
-  const y = Buffer.from(String(b))
-  return x.length === y.length && timingSafeEqual(x, y)
-}
-
-/* ─── hash de la contrasena ─── */
-
-export async function hashear(pass) {
-  const salt = randomBytes(16)
-  const dk = await scrypt(pass, salt, SCRYPT.len, { N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p, maxmem: MAXMEM })
-  return ['scrypt', SCRYPT.N, SCRYPT.r, SCRYPT.p, salt.toString('base64'), dk.toString('base64')].join('$')
-}
-
-export async function verificarPass(pass, guardado) {
-  // Se calcula un scrypt aunque no haya hash configurado: si no, el tiempo de
-  // respuesta delataria que el panel todavia no tiene contrasena puesta.
-  const partes = String(guardado || '').split('$')
-  if (partes.length !== 6 || partes[0] !== 'scrypt') {
-    await scrypt(pass, 'sin-configurar', SCRYPT.len, { N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p, maxmem: MAXMEM })
-    return false
-  }
-
-  // Los parametros salen del hash guardado, no de las constantes de arriba: asi
-  // subir el coste no invalida las contrasenas ya creadas. Pero se acotan antes
-  // de usarlos -- una N disparatada en el .env colgaria el proceso en cada
-  // intento de entrada.
-  const [, N, r, p, salt, dk] = partes
-  const nN = Number(N), nR = Number(r), nP = Number(p)
-  if (!(nN >= 1024 && nN <= 1048576 && nR >= 1 && nR <= 32 && nP >= 1 && nP <= 16)) return false
-
-  const calc = await scrypt(pass, Buffer.from(salt, 'base64'), Buffer.from(dk, 'base64').length,
-    { N: nN, r: nR, p: nP, maxmem: MAXMEM })
-  return igual(calc.toString('base64'), dk)
-}
 
 /* ─── cookie firmada ─── */
 

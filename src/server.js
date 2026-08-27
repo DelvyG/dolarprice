@@ -6,8 +6,11 @@ import apiRoutes from './routes/api.js'
 import pagesRoutes from './routes/pages.js'
 import collectRoutes from './routes/collect.js'
 import adminRoutes from './routes/admin.js'
+import referidosRoutes from './routes/referidos.js'
 import { cargarGeo } from './analytics/geo.js'
 import { contarPeticion, volcarTrafico, purgar, registrarDescargaApk } from './analytics/track.js'
+import { madurarSaldos } from './referidos/index.js'
+import { limpiarSesiones } from './referidos/cuentas.js'
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL || 'info' },
@@ -38,6 +41,7 @@ app.addHook('onResponse', async (req, reply) => {
 
 await app.register(apiRoutes)
 await app.register(collectRoutes)
+await app.register(referidosRoutes)
 
 await app.register(fastifyStatic, {
   root: join(ROOT, 'public'),
@@ -84,9 +88,11 @@ app.setErrorHandler((err, req, reply) => {
 setInterval(() => volcarTrafico(app.log), 60000).unref()
 
 const PURGA_CADA_MS = 6 * 3600000
-const purga = () =>
-  purgar(config.analytics.retencionDias, app.log)
-    .catch((e) => app.log.warn(`purga: ${e.message}`))
+const purga = async () => {
+  try { await purgar(config.analytics.retencionDias, app.log) } catch (e) { app.log.warn(`purga: ${e.message}`) }
+  try { await madurarSaldos(app.log) } catch (e) { app.log.warn(`referidos: cuarentena (${e.message})`) }
+  try { await limpiarSesiones(app.log) } catch (e) { app.log.warn(`referidos: limpieza (${e.message})`) }
+}
 
 setTimeout(purga, 120000).unref()          // dos minutos despues de arrancar
 setInterval(purga, PURGA_CADA_MS).unref()

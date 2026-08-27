@@ -20,4 +20,10 @@ export default async function pagesRoutes(app) {
   // Landing de la campaña: aqui es donde de verdad se instala la PWA, porque
   // beforeinstallprompt solo lo dispara Chrome en el propio dominio.
   app.get('/app', async (req, reply) => reply.type('text/html').sendFile('app.html'))
+
+  // A donde apuntan los enlaces de los correos de verificacion y de contrasena
+  // nueva. Sin esta ruta caeria en el catch-all, que devuelve index.html pero
+  // con un 404: funcionaria, y quedaria un 404 por cada usuario que confirma su
+  // cuenta ensuciando las estadisticas.
+  app.get('/cuenta', async (req, reply) => reply.type('text/html').sendFile('index.html'))
 }

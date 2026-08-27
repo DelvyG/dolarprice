@@ -60,6 +60,17 @@ export const config = {
     cookieSegura: process.env.ADMIN_COOKIE_INSEGURA !== '1',
   },
 
+  // Programa de referidos. Los montos y las reglas NO estan aqui: viven en la
+  // tabla admin_config y se editan desde /admin, para poder subir o bajar lo
+  // que se paga sin desplegar. Aqui solo lo que no puede vivir en la base.
+  referidos: {
+    // Firma de la cookie de sesion de los usuarios. Si se deja vacia se genera
+    // una al arrancar y cada reinicio del servicio cierra las sesiones -- que
+    // en un panel de una sola persona da igual, pero aqui echaria fuera a todo
+    // el mundo. En produccion hay que ponerla.
+    secret: process.env.USER_SESSION_SECRET || randomBytes(32).toString('hex'),
+  },
+
   analytics: {
     // Venezuela es UTC-4 todo el ano, sin horario de verano. Manda el
     // agrupamiento por dia y por hora del panel; en la base se guarda UTC.

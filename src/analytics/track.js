@@ -8,6 +8,7 @@
 import { query, ahora } from '../db.js'
 import { leerUA } from './ua.js'
 import { ubicar } from './geo.js'
+import { atribuir, marcarDia, CODIGO } from '../referidos/index.js'
 
 const TOPE_COLA = 500          // eventos en espera antes de empezar a descartar
 const TOPE_POR_IP = 120        // eventos por IP y por minuto
@@ -176,6 +177,23 @@ export function registrar(req, cuerpo, log) {
   const event = EVENTOS.has(cuerpo?.event) ? cuerpo.event : 'view'
   const geo = ubicar(ip, req.headers['cf-ipcountry'] || null)
   const referrer = txt(cuerpo?.r, 500)
+
+  // Referidos. Va aqui y no en una ruta aparte porque el beacon es lo unico
+  // que llega en CADA visita, que es justo lo que hace falta para contar los
+  // dias de actividad. No se espera al resultado: la analitica no puede
+  // retrasar una respuesta que ya se envio.
+  if (event === 'view') {
+    const codigo = typeof cuerpo?.ref === 'string' ? cuerpo.ref.toUpperCase().slice(0, 12) : null
+    if (codigo && CODIGO.test(codigo)) {
+      atribuir({
+        visitorId, codigo, ip,
+        countryCode: geo.countryCode,
+        modo: MODOS.has(cuerpo?.m) ? cuerpo.m : 'navegador',
+        userAgent: ua,
+      }, log)
+    }
+    marcarDia({ visitorId, modo: MODOS.has(cuerpo?.m) ? cuerpo.m : null }, log)
+  }
 
   cola.push({
     visitorId,
