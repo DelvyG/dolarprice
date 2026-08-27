@@ -183,16 +183,20 @@ export function registrar(req, cuerpo, log) {
   // dias de actividad. No se espera al resultado: la analitica no puede
   // retrasar una respuesta que ya se envio.
   if (event === 'view') {
+    const modo = MODOS.has(cuerpo?.m) ? cuerpo.m : 'navegador'
     const codigo = typeof cuerpo?.ref === 'string' ? cuerpo.ref.toUpperCase().slice(0, 12) : null
-    if (codigo && CODIGO.test(codigo)) {
-      atribuir({
-        visitorId, codigo, ip,
-        countryCode: geo.countryCode,
-        modo: MODOS.has(cuerpo?.m) ? cuerpo.m : 'navegador',
-        userAgent: ua,
-      }, log)
-    }
-    marcarDia({ visitorId, modo: MODOS.has(cuerpo?.m) ? cuerpo.m : null }, log)
+
+    // marcarDia va DESPUES de atribuir, encadenado. Lanzarlos a la vez era una
+    // carrera: en la primera visita se intentaba contar el dia antes de que la
+    // relacion existiera, asi que ese dia se perdia y hacian falta cuatro dias
+    // para lo que debian ser tres.
+    const antes = codigo && CODIGO.test(codigo)
+      ? atribuir({ visitorId, codigo, ip, countryCode: geo.countryCode, modo, userAgent: ua }, log)
+      : Promise.resolve()
+
+    antes
+      .then(() => marcarDia({ visitorId, modo }, log))
+      .catch((e) => log?.warn(`referidos: ${e.message}`))
   }
 
   cola.push({
