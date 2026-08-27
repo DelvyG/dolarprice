@@ -281,3 +281,94 @@ relojería — arreglarlo antes de reiniciar nada:
 ```bash
 cd /var/www/dolarprice && sudo -u dolarprice npm ci --omit=dev
 ```
+
+## Programa de referidos (`/api/v1/cuenta`, `/api/v1/ref`, pestaña Referidos de `/admin`)
+
+Encendido el 27/08/2026. El usuario comparte su código, gana dinero real cuando sus
+referidos usan la app, y cobra por Binance. Los montos y las reglas se editan desde el
+panel, no desde el `.env`: lo que se paga es justo lo que hay que poder subir o bajar en
+caliente. Al cierre: **$0,20 por referido, mínimo $10 para retirar, tope $100/mes.**
+
+### Las dos decisiones que explican todo el diseño
+
+**Un referido NO cuenta por instalar, sino por usar la app N días DISTINTOS** (3 por
+defecto), y después el saldo pasa una cuarentena (7 días) antes de poder retirarse. Aquí
+sale dinero real y pagar por instalación se farmea: levantar mil instalaciones falsas es
+barato, mantenerlas abriendo la app tres días no lo es. La cuarentena es la ventana para
+cazar el fraude **antes** de pagarlo. No cambiar esto por "es que así ven su premio
+antes".
+
+**La cuenta es de la PERSONA, no del aparato.** La primera versión ató el saldo al
+`visitor_id` del navegador y se cae sola: quien cambiara de teléfono o quisiera mirar sus
+ganancias desde la PC perdería el dinero. De ahí `ref_users` (la cuenta) + `ref_devices`
+(los navegadores enlazados). Para consultar el dólar **no** hay que registrarse; solo
+para cobrar.
+
+### Cómo se atribuye una instalación del APK
+
+Sale gratis de que el APK sea una **TWA** y no un WebView: corre Chrome de verdad, así
+que **comparte cookies y `localStorage` con el navegador** para dolarprice.com. Alguien
+abre `dolarprice.com/app?ref=CODIGO` en Chrome, instala el APK, lo abre — y el código
+sigue en `localStorage`, así que el beacon lo manda igual. **No hace falta ningún sistema
+de atribución de instalaciones.** Queda pendiente confirmarlo en un teléfono real.
+
+### Trampas ya pisadas
+
+**El código de referido viaja en el beacon** (`/api/v1/e`), no en una ruta aparte: el
+beacon es lo único que llega en CADA visita, que es justo lo que hace falta para contar
+los días de actividad.
+
+**`atribuir()` y `marcarDia()` van encadenados, no en paralelo.** Lanzarlos a la vez era
+una carrera: en la primera visita se intentaba contar el día antes de que la relación
+existiera, así que ese día se perdía y hacían falta cuatro días para lo que debían ser
+tres. Ya pasó una vez.
+
+**Al rechazar un retiro hay que DEVOLVER el saldo.** Se descuenta al pedirlo (en la misma
+sentencia que comprueba que alcanza, con `WHERE saldo_libre >= ?`, para que dos
+peticiones simultáneas no cobren dos veces). Si al rechazar no se devolviera, el dinero
+del usuario se quedaría en el limbo.
+
+**Descartar un marcado lo cierra como `validado = 1, madurado = 1, recompensa = 0.**
+Parece raro pero es lo que lo saca de la lista de pendientes sin pagar nada. Si solo se
+cambiara el texto de `sospechoso`, seguiría apareciendo para siempre.
+
+**`numero()` en `src/admin/ajustes.js` comprueba null ANTES de `Number()`.** `Number(null)`
+es `0` y `0` sí es finito: comprobar solo `isFinite()` hacía que una clave inexistente
+devolviera 0 en vez de su valor por defecto — o sea, **pagar cero a todo el mundo**.
+
+### Antifraude
+
+Un aparato se refiere una sola vez en la vida (PK de `referrals`). Autorreferido
+bloqueado vía `ref_devices`. Más de N referidos desde la misma IP se **marca**, no se
+descarta —una familia comparte wifi— y no se paga sin aprobarlo a mano. Tope diario por
+referidor y **tope mensual global**: al llegar se deja de validar, no de contar, así que
+al subir el tope o al entrar el mes siguiente esos referidos se validan solos.
+
+### Pagos
+
+**Se pagan a mano.** El botón "Pagado" del panel NO envía dinero: lo anota y avisa al
+usuario por correo. Automatizarlo exigiría claves de Binance **con permiso de retiro** en
+un VPS compartido con sitios de clientes; si esa máquina se compromete, se van los fondos.
+No hacerlo.
+
+### Correo
+
+Resend, dominio `dolarprice.com` verificado. `src/correo.js` soporta además Brevo y SMTP
+y elige solo según qué variable haya en el `.env`. El remitente es `noreply@` pero lleva
+**Reply-To** a una dirección real: aquí se mueve dinero y una respuesta de "no me llegó el
+pago" no puede caer en un buzón que nadie lee. Si no hay proveedor configurado, el
+registro **sigue funcionando**: que no se pueda mandar un correo no puede dejar a nadie
+fuera.
+
+### Al tocar la interfaz
+
+La tarjeta vive en Inicio, junto al botón de compartir, y **no** como quinta pestaña:
+cinco iconos en la barra de abajo se aprietan demasiado en pantalla pequeña. Está en
+`public/index.html` + `app.js` + `styles.css`, así que **cualquier cambio obliga a subir
+el `?v=N` en los tres sitios de siempre** (index.html, la lista `SHELL` de sw.js y su
+constante `VERSION`).
+
+**Ojo con `String.replace()` al editar estos ficheros con scripts:** en la cadena de
+reemplazo, `$'` y `$&` tienen significado propio y se comen el texto. Un `const usd = (v)
+=> '$' + ...` corrompió `admin.html` entero por esto. Usar siempre una **función** de
+reemplazo.
