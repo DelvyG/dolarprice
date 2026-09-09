@@ -98,6 +98,66 @@ export default async function apiRoutes(app) {
     return { code, source, dias, puntos: filas.map((f) => ({ fecha: f.dia, valor: num(f.rate) })) }
   })
 
+  // Que valia cada moneda en una fecha dada. Dos cosas obligan a que esto no
+  // sea un "WHERE DATE(fetched_at) = ?": el BCV no publica sabados, domingos ni
+  // feriados, y el historico solo guarda la lectura cuando el valor cambio. Un
+  // sabado no tiene fila propia y aun asi tiene tasa vigente: la del viernes.
+  // Por eso se devuelve la ultima lectura HASTA esa fecha, junto con el dia del
+  // que salio, para que la interfaz pueda decirlo en vez de aparentar que el
+  // BCV publico ese sabado.
+  app.get('/api/v1/on', async (req, reply) => {
+    const fecha = String(req.query.date ?? '').slice(0, 10)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(fecha))) {
+      return reply.code(400).send({ error: 'Se espera date en formato YYYY-MM-DD' })
+    }
+
+    const [limites = {}] = await query(
+      'SELECT MIN(DATE(`fetched_at`)) AS desde, MAX(DATE(`fetched_at`)) AS hasta FROM `rates_history`'
+    )
+
+    const filas = await query(
+      `SELECT h.\`code\`, h.\`source\`, h.\`rate\`, DATE(h.\`fetched_at\`) AS dia
+         FROM \`rates_history\` h
+         JOIN (
+           SELECT \`code\`, \`source\`, MAX(\`id\`) mid
+             FROM \`rates_history\`
+            WHERE \`fetched_at\` < DATE_ADD(?, INTERVAL 1 DAY)
+            GROUP BY \`code\`, \`source\`
+         ) u ON u.mid = h.\`id\``,
+      [fecha]
+    )
+
+    const monedas = {}
+    let binance = null
+    for (const f of filas) {
+      const lectura = { valor: num(f.rate), fecha: f.dia }
+      if (f.source === 'BINANCE') binance = lectura
+      else monedas[f.code] = lectura
+    }
+
+    // El promedio solo existe con los dos lados, igual que en el conversor.
+    const usd = monedas.USD ?? null
+    const promedio = usd && binance
+      ? { valor: (usd.valor + binance.valor) / 2, fecha: usd.fecha > binance.fecha ? usd.fecha : binance.fecha,
+          bcv: usd.fecha, binance: binance.fecha }
+      : null
+
+    // Una fecha pasada ya no cambia nunca; la de hoy si, cada 10 minutos.
+    const hoy = new Date().toISOString().slice(0, 10)
+    const segundos = fecha < hoy ? 86400 : 300
+    reply.header('Cache-Control', `public, max-age=${segundos}, s-maxage=${segundos}`)
+
+    return {
+      fecha,
+      desde: limites.desde ?? null,
+      hasta: limites.hasta ?? null,
+      hay: Boolean(binance || Object.keys(monedas).length),
+      monedas,
+      binance,
+      promedio,
+    }
+  })
+
   app.get('/api/v1/news', async (req, reply) => {
     // El limite se acota y se interpola porque LIMIT no admite parametro en
     // sentencias preparadas de MySQL; el valor ya viene forzado a entero.

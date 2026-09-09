@@ -17,7 +17,7 @@
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
-<link rel="stylesheet" href="/styles.css?v=10">
+<link rel="stylesheet" href="/styles.css?v=11">
 <meta property="og:title" content="DolarPrice · Dólar BCV y paralelo">
 <meta property="og:description" content="Precio del dólar BCV y del paralelo Binance P2P en Venezuela.">
 <meta property="og:type" content="website">
@@ -163,6 +163,15 @@
     <div class="chart-wrap"><svg id="chart" viewBox="0 0 320 150" preserveAspectRatio="none" role="img" aria-label="Gráfico histórico"></svg></div>
     <div class="chart-legend" id="chart-legend"></div>
     <div class="list" id="lista-hist"></div>
+
+    <!-- Consulta por fecha. Vive al final del Historico para no romper el flujo
+         seg -> chips -> grafico, que va de una sola moneda; esto es lo contrario:
+         una sola fecha y todas las monedas. -->
+    <h3 class="h3">¿Cuánto estaba en una fecha?</h3>
+    <p class="h3sub" id="fecha-rango">Elige un día y verás todas las tasas de ese día.</p>
+    <input type="date" id="hist-fecha" class="fecha-in" aria-label="Fecha a consultar">
+    <div class="list" id="lista-fecha"></div>
+
   </section>
 
 </main>
@@ -202,6 +211,6 @@
 
 <div id="hoja-cuenta"><div class="hc"><div class="hc-agarre"></div><div id="hc-cuerpo"></div></div></div>
 
-<script src="/app.js?v=14" type="module"></script>
+<script src="/app.js?v=15" type="module"></script>
 </body>
 </html>

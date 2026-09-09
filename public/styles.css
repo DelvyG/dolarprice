@@ -28,6 +28,9 @@
   --tabh: 62px;
 
   --ease: cubic-bezier(.32,.72,0,1);
+
+  /* El icono del calendario del input date se invierte solo en oscuro. */
+  --cal-inv: 1;
 }
 
 /* En claro los acentos se oscurecen. Los tonos de arriba estan calculados para
@@ -47,6 +50,7 @@
   --brand-2:   #15803D;
   --teal:      #0F766E;
   --binance:   #A16207;
+  --cal-inv:   0;
 }
 
 @media (prefers-color-scheme: light) {
@@ -63,6 +67,7 @@
     --brand-2:   #15803D;
     --teal:      #0F766E;
     --binance:   #A16207;
+    --cal-inv:   0;
   }
 }
 
@@ -465,6 +470,22 @@ main.sheet-abierto { padding-bottom: 58vh; }
 }
 #chart { width: 100%; height: 160px; display: block; overflow: visible; }
 .chart-legend { display: flex; justify-content: space-between; margin: 9px 2px 18px; font-size: .73rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Consulta por fecha del Historico */
+.h3 { margin: 26px 0 3px; font-size: 1.02rem; font-weight: 700; letter-spacing: -.02em; }
+.h3sub { margin: 0 0 11px; font-size: .76rem; color: var(--muted); }
+.fecha-in {
+  width: 100%; margin-bottom: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text);
+  font: inherit; font-size: .9rem; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fecha-in:focus { outline: none; border-color: color-mix(in srgb, var(--brand-2) 55%, transparent); }
+/* El icono del calendario nace negro y en el tema oscuro no se ve. */
+.fecha-in::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .55; filter: invert(var(--cal-inv, 1)); }
+
 
 /* ═══ Barra de pestanas ═══ */
 .tabs {

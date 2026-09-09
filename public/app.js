@@ -582,6 +582,7 @@ async function cargarHistorial() {
     const { puntos } = await res.json()
     dibujarGrafico(puntos)
     pintarListaHistorial(puntos)
+    iniciarFecha()
   } catch {
     dibujarGrafico([])
     $('#lista-hist').innerHTML = '<p class="note">No se pudo cargar el histórico.</p>'
@@ -645,6 +646,85 @@ function pintarListaHistorial(puntos) {
     })
     .join('')
 }
+
+/* ─── que valia cada moneda en una fecha ─── */
+
+const hoyYMD = () => new Date().toISOString().slice(0, 10)
+
+let fechaLista = false
+
+// El input arranca en hoy y no deja salirse del rango que existe de verdad:
+// pedir una fecha anterior al primer registro solo produce una lista vacia.
+async function iniciarFecha() {
+  if (fechaLista) return
+  fechaLista = true
+  const input = $('#hist-fecha')
+  input.max = hoyYMD()
+  input.value = hoyYMD()
+  await consultarFecha()
+}
+
+$('#hist-fecha').addEventListener('change', () => { vibrar(); consultarFecha() })
+
+async function consultarFecha() {
+  const input = $('#hist-fecha')
+  const fecha = input.value
+  const lista = $('#lista-fecha')
+  if (!fecha) return
+
+  try {
+    const res = await fetch(`/api/v1/on?date=${fecha}`)
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    const d = await res.json()
+
+    if (d.desde) {
+      input.min = d.desde
+      $('#fecha-rango').textContent = `Hay registro desde el ${fechaLarga(d.desde)}.`
+    }
+
+    if (!d.hay) {
+      lista.innerHTML = `<p class="note">No hay registro del ${fechaLarga(fecha)}. El histórico empieza el ${fechaLarga(d.desde)}.</p>`
+      return
+    }
+
+    const filas = []
+
+    for (const [code, [nombre]] of Object.entries(NOMBRES)) {
+      const m = d.monedas?.[code]
+      if (m) filas.push(fila(code, nombre, m.valor, notaDia(m.fecha, fecha)))
+    }
+    if (d.binance) {
+      filas.push(fila('P2P', 'Binance', d.binance.valor, notaDia(d.binance.fecha, fecha), 'var(--binance)'))
+    }
+    if (d.promedio) {
+      // Se dice de que dos lecturas sale: en fin de semana el BCV es de dias
+      // antes y el P2P es del mismo dia, y el promedio hereda esa mezcla.
+      const nota = d.promedio.bcv === d.promedio.binance
+        ? notaDia(d.promedio.bcv, fecha)
+        : `BCV del ${fechaLarga(d.promedio.bcv)} · Binance del ${fechaLarga(d.promedio.binance)}`
+      filas.push(fila('PROM', 'Promedio', d.promedio.valor, nota))
+    }
+
+    lista.innerHTML = filas.join('')
+  } catch {
+    lista.innerHTML = '<p class="note">No se pudo consultar esa fecha.</p>'
+  }
+}
+
+// Si la lectura no es del dia pedido, se dice: el BCV no publica fines de
+// semana ni feriados y su tasa de ese dia es la de la ultima jornada habil.
+const notaDia = (dia, pedida) =>
+  dia === pedida ? 'tasa de ese día' : `sin cambio desde el ${fechaLarga(dia)}`
+
+const fila = (code, nombre, valor, nota, color) => `
+  <div class="item">
+    <div class="item-code"${color ? ` style="color:${color}"` : ''}>${code}</div>
+    <div class="item-body">
+      <div class="item-name">${nombre}</div>
+      <div class="item-note">${nota}</div>
+    </div>
+    <div class="item-val">${fmt(valor)}<small>bolívares</small></div>
+  </div>`
 
 /* ─── tirar para recargar ─── */
 
