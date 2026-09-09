@@ -16,6 +16,14 @@ const NOMBRES = {
   RUB: ['Rublo', 'Rusia'],
 }
 
+// Las tres opciones del conversor. PROMEDIO es el punto medio entre el dolar
+// oficial y el P2P; el conversor solo trabaja con una tasa a la vez.
+const FUENTES = {
+  BCV:      { etiqueta: 'Dólares', simbolo: '$',    nombre: 'dólar BCV' },
+  BINANCE:  { etiqueta: 'USDT',    simbolo: 'USDT', nombre: 'Binance P2P' },
+  PROMEDIO: { etiqueta: 'Dólares', simbolo: '$',    nombre: 'promedio BCV/Binance' },
+}
+
 const fmt = (n, dec = 2) =>
   new Intl.NumberFormat('es-VE', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(n)
 
@@ -86,7 +94,13 @@ $('#btn-theme').addEventListener('click', () => {
 function tasaActiva() {
   const d = estado.datos
   if (!d) return null
-  return estado.fuente === 'BCV' ? (d.bcv?.monedas?.USD ?? null) : (d.binance?.promedio ?? null)
+  const bcv = d.bcv?.monedas?.USD ?? null
+  const bin = d.binance?.promedio ?? null
+  if (estado.fuente === 'BCV') return bcv
+  if (estado.fuente === 'BINANCE') return bin
+  // El promedio solo existe si existen los dos lados: con una sola fuente no es
+  // un promedio, y aqui nunca se inventa una tasa.
+  return bcv && bin ? (bcv + bin) / 2 : null
 }
 
 async function cargar({ forzar = false } = {}) {
@@ -231,8 +245,7 @@ function calcular() {
   $('#row-a').classList.toggle('on', estado.fila === 'a')
   $('#row-b').classList.toggle('on', estado.fila === 'b')
 
-  const etiqueta = estado.fuente === 'BCV' ? 'Dólares' : 'USDT'
-  const simbolo = estado.fuente === 'BCV' ? '$' : 'USDT'
+  const { etiqueta, simbolo } = FUENTES[estado.fuente]
   $('#lbl-a').textContent = etiqueta
   $('#sym-a').textContent = simbolo
 }
@@ -368,10 +381,9 @@ $('#btn-share').addEventListener('click', async () => {
   const tasa = tasaActiva()
   if (!tasa) return toast('Todavía no hay tasa que compartir')
 
-  const nombre = estado.fuente === 'BCV' ? 'dólar BCV' : 'Binance P2P'
+  const { nombre, simbolo } = FUENTES[estado.fuente]
   const a = $('#val-a').textContent
   const b = $('#val-b').textContent
-  const simbolo = estado.fuente === 'BCV' ? '$' : 'USDT'
   const texto = `${a} ${simbolo} = ${b} Bs\nTasa ${nombre}: ${fmt(tasa)} Bs\n\nvía dolarprice.com`
 
   try {
