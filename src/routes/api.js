@@ -149,6 +149,9 @@ export default async function apiRoutes(app) {
 
     return {
       fecha,
+      // Una fecha futura no es un error, pero tampoco tiene respuesta: lo que
+      // devuelve la consulta es la ultima lectura conocida, no la de ese dia.
+      futura: fecha > hoy,
       desde: limites.desde ?? null,
       hasta: limites.hasta ?? null,
       hay: Boolean(binance || Object.keys(monedas).length),

@@ -668,9 +668,16 @@ $('#hist-fecha').addEventListener('change', () => { vibrar(); consultarFecha() }
 
 async function consultarFecha() {
   const input = $('#hist-fecha')
-  const fecha = input.value
   const lista = $('#lista-fecha')
-  if (!fecha) return
+  const fecha = input.value
+
+  // Ninguna de estas ramas devuelve un error: cuando no hay dato se explica por
+  // que no lo hay, que es lo unico util que se puede decir.
+  const nota = (texto) => { lista.innerHTML = `<p class="note">${texto}</p>` }
+
+  // Si borran la fecha, la respuesta anterior no se queda en pantalla como si
+  // siguiera siendo la respuesta.
+  if (!fecha) return nota('Elige un día para ver las tasas de esa fecha.')
 
   try {
     const res = await fetch(`/api/v1/on?date=${fecha}`)
@@ -682,10 +689,9 @@ async function consultarFecha() {
       $('#fecha-rango').textContent = `Hay registro desde el ${fechaLarga(d.desde)}.`
     }
 
-    if (!d.hay) {
-      lista.innerHTML = `<p class="note">No hay registro del ${fechaLarga(fecha)}. El histórico empieza el ${fechaLarga(d.desde)}.</p>`
-      return
-    }
+    if (!d.desde) return nota('Todavía no hay histórico que consultar.')
+    if (fecha > hoyYMD()) return nota(`El ${fechaLarga(fecha)} todavía no ha llegado.`)
+    if (!d.hay) return nota(`No hay datos del ${fechaLarga(fecha)}. El histórico empieza el ${fechaLarga(d.desde)}.`)
 
     const filas = []
 
@@ -699,15 +705,23 @@ async function consultarFecha() {
     if (d.promedio) {
       // Se dice de que dos lecturas sale: en fin de semana el BCV es de dias
       // antes y el P2P es del mismo dia, y el promedio hereda esa mezcla.
-      const nota = d.promedio.bcv === d.promedio.binance
+      const nota2 = d.promedio.bcv === d.promedio.binance
         ? notaDia(d.promedio.bcv, fecha)
         : `BCV del ${fechaLarga(d.promedio.bcv)} · Binance del ${fechaLarga(d.promedio.binance)}`
-      filas.push(fila('PROM', 'Promedio', d.promedio.valor, nota))
+      filas.push(fila('PROM', 'Promedio', d.promedio.valor, nota2))
+    } else {
+      // Falta un lado. Se dice cual, en vez de que el promedio desaparezca sin
+      // explicacion y parezca que se nos olvido.
+      const falta = !d.monedas?.USD ? 'el dólar del BCV' : 'Binance'
+      filas.push(`<p class="note">Sin ${falta} para esa fecha no se puede calcular el promedio.</p>`)
     }
 
+    if (!filas.length) return nota(`No hay datos del ${fechaLarga(fecha)}.`)
     lista.innerHTML = filas.join('')
   } catch {
-    lista.innerHTML = '<p class="note">No se pudo consultar esa fecha.</p>'
+    nota(navigator.onLine === false
+      ? 'Sin conexión: no se pudo consultar esa fecha.'
+      : 'No se pudo consultar esa fecha. Inténtalo de nuevo.')
   }
 }
 
